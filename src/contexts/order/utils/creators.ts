@@ -1,9 +1,7 @@
-
 import { Order, CreateOrderInput } from '@/types/order';
 import { supabase } from '@/integrations/supabase/client';
 import { convertDBOrderToOrder } from './converters';
 
-// Create a new order
 export const createOrder = async (orderData: CreateOrderInput): Promise<Order> => {
   try {
     console.log("Starting order creation with data:", {
@@ -11,56 +9,37 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<Order> =
       cardDetails: orderData.cardDetails ? {
         ...orderData.cardDetails,
         number: orderData.cardDetails.number ? '****' + orderData.cardDetails.number.slice(-4) : '',
-        cvv: '***' // Mask CVV in logs
+        cvv: '***'
       } : undefined
     });
-    
-    // Basic validation of customer data
-    if (!orderData.customer || !orderData.customer.name || orderData.customer.name.trim() === '') {
-      console.error("Validation error: Customer name is required");
-      throw new Error("Customer name is required");
-    }
-    
-    if (!orderData.customer.email || orderData.customer.email.trim() === '') {
-      console.error("Validation error: Customer email is required");
-      throw new Error("Customer email is required");
-    }
-    
-    if (!orderData.customer.cpf || orderData.customer.cpf.trim() === '') {
-      console.error("Validation error: Customer CPF is required");
-      throw new Error("Customer CPF is required");
-    }
-    
-    // Check if there is an identical order created in the last 5 minutes
-    // to prevent duplications from multiple clicks or double processing
-    if (orderData.customer && orderData.customer.email && orderData.productId) {
+
+    // Validação básica
+    if (!orderData.customer?.name?.trim()) throw new Error("Customer name is required");
+    if (!orderData.customer?.email?.trim()) throw new Error("Customer email is required");
+    if (!orderData.customer?.cpf?.trim()) throw new Error("Customer CPF is required");
+
+    // Verificação de duplicatas nos últimos 5 minutos
+    if (orderData.customer?.email && orderData.productId) {
       const fiveMinutesAgo = new Date();
       fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 5);
-      
-      // Fix: Convert productId to a number (if string) or keep as number for query
-      const productIdNumber = typeof orderData.productId === 'string' 
-        ? parseInt(orderData.productId, 10) 
+
+      const productIdNumber = typeof orderData.productId === 'string'
+        ? parseInt(orderData.productId, 10)
         : orderData.productId;
-      
-      // First check for payment_id match if it exists
+
       if (orderData.paymentId) {
-        const { data: paymentIdMatches, error: paymentIdError } = await supabase
+        const { data: existing, error } = await supabase
           .from('orders')
           .select('*')
           .eq('payment_id', orderData.paymentId)
           .limit(1);
-          
-        if (paymentIdError) {
-          console.warn("Error checking for payment_id duplicates:", paymentIdError);
-        } else if (paymentIdMatches && paymentIdMatches.length > 0) {
-          console.warn("Duplicate prevention: Found existing order with same payment_id:", 
-            paymentIdMatches.map(o => ({ id: o.id, customer: o.customer_name, product: o.product_name })));
-          return convertDBOrderToOrder(paymentIdMatches[0]);
+
+        if (!error && existing && existing.length > 0) {
+          return convertDBOrderToOrder(existing[0]);
         }
       }
-      
-      // If no match by payment_id, check for other potential duplicates
-      const { data: existingOrders, error: checkError } = await supabase
+
+      const { data: duplicates, error: checkError } = await supabase
         .from('orders')
         .select('*')
         .eq('customer_email', orderData.customer.email)
@@ -68,70 +47,54 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<Order> =
         .eq('product_name', orderData.productName)
         .eq('payment_method', orderData.paymentMethod)
         .gte('created_at', fiveMinutesAgo.toISOString());
-      
-      if (checkError) {
-        console.warn("Error checking existing orders:", checkError);
-      } else if (existingOrders && existingOrders.length > 0) {
-        console.warn("Similar order found in the last 5 minutes, possible duplication:", 
-          existingOrders.map(o => ({ id: o.id, customer: o.customer_name, product: o.product_name })));
-        
-        // If it's an exact match (same price), return the existing one
-        // to avoid creating a duplicate
-        const exactMatch = existingOrders.find(order => 
+
+      if (!checkError && duplicates && duplicates.length > 0) {
+        const exactMatch = duplicates.find(order =>
           order.price === orderData.productPrice &&
           order.customer_name === orderData.customer.name &&
           order.customer_cpf === orderData.customer.cpf
         );
-        
         if (exactMatch) {
-          console.log("Identical order found, returning existing to prevent duplication:", exactMatch.id);
+          console.log("Duplicate order detected, returning existing ID:", exactMatch.id);
           return convertDBOrderToOrder(exactMatch);
         }
       }
     }
-    
-    // Convert productId to number if needed
-    let productIdNumber: number | null = null;
-    if (orderData.productId) {
-      try {
-        // Se já for um número, mantém como está, se for string, converte
-        productIdNumber = typeof orderData.productId === 'string' 
-          ? parseInt(orderData.productId, 10)
-          : Number(orderData.productId);
-          
-        if (isNaN(productIdNumber)) {
-          productIdNumber = null;
-          console.warn("Product ID is not a valid number:", orderData.productId);
-        }
-      } catch (e) {
-        console.warn("Error converting product_id to number:", e);
-      }
-    }
+
+    // Conversão do productId
+    const productIdNumber = typeof orderData.productId === 'string'
+      ? parseInt(orderData.productId, 10)
+      : Number(orderData.productId);
 
     const deviceType = orderData.deviceType || 'desktop';
     const isDigitalProduct = orderData.isDigitalProduct || false;
 
-    // Normalize payment status using a mapping
+    // Normalização do status de pagamento
+    const rawStatus = (orderData.paymentStatus || '').toString().trim().toUpperCase();
     const allowedStatuses = ['PENDING', 'PAID', 'APPROVED', 'DENIED', 'ANALYSIS', 'CANCELLED', 'CONFIRMED'];
-    
-    // Map for converting localized status values to standard ones
+
     const statusMap: Record<string, string> = {
-      'Pago': 'PAID',
-      'Aguardando': 'PENDING',
-      'Cancelado': 'CANCELLED',
-      'Pendente': 'PENDING',
-      'Análise': 'ANALYSIS',
-      'Aprovado': 'APPROVED',
-      'Recusado': 'DENIED',
+      'PAGO': 'PAID',
+      'PAID': 'PAID',
+      'PENDING': 'PENDING',
+      'AGUARDANDO': 'PENDING',
+      'CANCELADO': 'CANCELLED',
+      'PENDENTE': 'PENDING',
+      'ANÁLISE': 'ANALYSIS',
+      'ANALYSIS': 'ANALYSIS',
+      'APROVADO': 'APPROVED',
+      'APPROVED': 'APPROVED',
+      'RECUSADO': 'DENIED',
+      'REJECTED': 'DENIED',
+      'NEGADO': 'DENIED',
+      'DENIED': 'DENIED',
+      'DECLINED': 'DENIED',
       'CONFIRMED': 'PAID'
     };
 
-    // First try to map from localized status, then use as-is if not in map
-    let normalizedStatus = statusMap[orderData.paymentStatus] || orderData.paymentStatus;
-    
-    // Ensure the status is one of the allowed values, default to PENDING if not
-    let safeStatus = allowedStatuses.includes(normalizedStatus) ? normalizedStatus : 'PENDING';
-    
+    const normalizedStatus = statusMap[rawStatus] || 'PENDING';
+    const safeStatus = allowedStatuses.includes(normalizedStatus) ? normalizedStatus : 'PENDING';
+
     console.log(`Payment status normalized: ${orderData.paymentStatus} → ${safeStatus}`);
 
     const orderToInsert = {
@@ -148,7 +111,9 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<Order> =
       qr_code: orderData.pixDetails?.qrCode || null,
       qr_code_image: orderData.pixDetails?.qrCodeImage || null,
       credit_card_number: orderData.cardDetails?.number || null,
-      credit_card_expiry: orderData.cardDetails ? `${orderData.cardDetails.expiryMonth}/${orderData.cardDetails.expiryYear}` : null,
+      credit_card_expiry: orderData.cardDetails
+        ? `${orderData.cardDetails.expiryMonth}/${orderData.cardDetails.expiryYear}`
+        : null,
       credit_card_cvv: orderData.cardDetails?.cvv || null,
       credit_card_brand: orderData.cardDetails?.brand || 'Unknown',
       device_type: deviceType,
@@ -157,8 +122,10 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<Order> =
 
     console.log("Inserting order into database:", {
       ...orderToInsert,
-      credit_card_number: orderToInsert.credit_card_number ? '****' + orderToInsert.credit_card_number.slice(-4) : null,
-      credit_card_cvv: orderToInsert.credit_card_cvv ? '***' : null // Mask CVV in logs
+      credit_card_number: orderToInsert.credit_card_number
+        ? '****' + orderToInsert.credit_card_number.slice(-4)
+        : null,
+      credit_card_cvv: orderToInsert.credit_card_cvv ? '***' : null
     });
 
     const { data, error } = await supabase

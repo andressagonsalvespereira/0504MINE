@@ -1,3 +1,6 @@
+import { PaymentStatus } from '@/types/order';
+
+
 
 export interface ProductDetailsType {
   id: string;
@@ -6,6 +9,9 @@ export interface ProductDetailsType {
   description: string;
   image: string;
   isDigital: boolean;
+  // ✅ Adicione essas duas propriedades:
+  usarProcessamentoPersonalizado?: boolean;
+  statusCartaoManual?: PaymentStatus | null;
 }
 
 export const getProductDetails = (slug?: string): ProductDetailsType => {

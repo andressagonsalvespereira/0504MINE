@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import CardForm, { CardFormData } from './payment-methods/CardForm';
 import PaymentError from './payment-methods/PaymentError';
 import PaymentStatusMessage from './payment-methods/PaymentStatusMessage';
-import { useCardPayment } from '@/hooks/payment/useCardPayment';
+import { useCreditCardPayment } from '@/hooks/payment/useCreditCardPayment';
 import { PaymentResult } from '@/types/payment';
 import { logger } from '@/utils/logger';
 import { AsaasSettings, ManualCardStatus } from '@/types/asaas';
@@ -38,7 +38,7 @@ const CheckoutForm = ({
     getButtonText,
     getAlertMessage,
     getAlertStyles
-  } = useCardPayment({
+  } = useCreditCardPayment({
     isSandbox,
     useCustomProcessing,
     manualCardStatus,

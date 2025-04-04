@@ -7,7 +7,7 @@ import PersonalInfoWrapper from './personal/PersonalInfoWrapper';
 import AddressSectionWrapper from './address/AddressSectionWrapper';
 import PaymentMethodWrapper from './payment/PaymentMethodWrapper';
 import OrderSummaryWrapper from './order/OrderSummaryWrapper';
-import { useCheckoutContainerOrder } from './hooks/useCheckoutContainerOrder';
+import { useCheckoutOrder } from '@/hooks/payment/order/useCheckoutContainerOrder';
 
 interface CheckoutProgressContainerProps {
   paymentMethod: 'card' | 'pix';
@@ -73,11 +73,29 @@ const CheckoutProgressContainer: React.FC<CheckoutProgressContainerProps> = ({
     handlePayment(paymentInfo);
   };
 
-  const { createOrder, customerData, isProcessing: isProcessingOrder } = useCheckoutContainerOrder({
+  const { createOrder, isProcessing: isProcessingOrder } = useCheckoutOrder({
     formState,
     productDetails,
     handlePayment: handleOrderCreated
   });
+  
+  const customerData = {
+    name: formState.fullName,
+    email: formState.email,
+    cpf: formState.cpf,
+    phone: formState.phone,
+    address: formState.street ? {
+      street: formState.street,
+      number: formState.number,
+      complement: formState.complement,
+      neighborhood: formState.neighborhood,
+      city: formState.city,
+      state: formState.state,
+      postalCode: formState.cep.replace(/\D/g, '')
+    } : undefined
+  };
+  
+  
 
   // Validate if the selected payment method is allowed based on settings
   React.useEffect(() => {

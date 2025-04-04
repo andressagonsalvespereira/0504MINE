@@ -17,7 +17,7 @@ export interface UseCardPaymentProps {
   settings?: AsaasSettings;
 }
 
-export function useCardPayment({
+export function useCreditCardPayment({
   onSubmit,
   isSandbox,
   isDigitalProduct = false,

@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 import { CustomerData, PaymentResult } from '@/components/checkout/payment/shared/types';
 import { AsaasSettings } from '@/types/asaas';
 import { DeviceType } from '@/types/order';
-import { detectDeviceType } from '@/components/checkout/progress/hooks/utils/deviceDetection';
+import { detectDeviceType } from '@/hooks/payment/utils/deviceDetection';
 
 export interface UsePixSubmissionProps {
   onSubmit: (data: PaymentResult) => Promise<any>;

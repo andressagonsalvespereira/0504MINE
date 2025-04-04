@@ -1,9 +1,9 @@
-
 import React from 'react';
 import PaymentMethodSection from '@/components/checkout/PaymentMethodSection';
 import { ProductDetailsType } from '@/components/checkout/ProductDetails';
-import { Order, CardDetails, PixDetails } from '@/types/order';
-import { usePaymentWrapper } from './hooks/usePaymentWrapper';
+import { Order, CardDetails, PixDetails, PaymentStatus } from '@/types/order';
+import { usePaymentWrapper } from '@/hooks/payment/wrapper/usePaymentWrapper';
+import { resolveManualStatus } from '@/contexts/order/utils/resolveManualStatus';
 
 interface CustomerData {
   name: string;
@@ -28,7 +28,7 @@ export interface PaymentMethodWrapperProps {
   customerData: CustomerData;
   createOrder: (
     paymentId: string,
-    status: 'pending' | 'confirmed',
+    status: PaymentStatus,
     cardDetails?: CardDetails,
     pixDetails?: PixDetails
   ) => Promise<Order>;
@@ -49,9 +49,23 @@ const PaymentMethodWrapper: React.FC<PaymentMethodWrapperProps> = ({
     <PaymentMethodSection
       paymentMethod={paymentMethod}
       setPaymentMethod={setPaymentMethod}
-      createOrder={(paymentId, status, cardDetails, pixDetails) => 
-        handleOrderCreation(paymentId, status, createOrder, cardDetails, pixDetails)
-      }
+      createOrder={(paymentId, rawStatus, cardDetails, pixDetails) => {
+        const raw = productDetails.usarProcessamentoPersonalizado
+          ? productDetails.statusCartaoManual
+          : rawStatus;
+
+        const resolved = resolveManualStatus(raw);
+
+        const status: PaymentStatus =
+          resolved === 'CONFIRMED' ? 'PAID' :
+          resolved === 'REJECTED' ? 'DENIED' :
+          'PENDING';
+
+        return handleOrderCreation(
+          { paymentId, status, cardDetails, pixDetails },
+          createOrder
+        );
+      }}
       productDetails={productDetails}
       customerData={customerData}
       isProcessing={isProcessing}

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +13,7 @@ import CheckoutProgressContainer from '@/components/checkout/progress/CheckoutPr
 import ProductNotFound from '@/components/checkout/quick-checkout/ProductNotFound';
 import { PaymentMethod, PaymentStatus } from '@/types/order';
 import { logger } from '@/utils/logger';
+import { resolveManualStatus } from '@/contexts/order/utils/resolveManualStatus';
 
 const Checkout: React.FC = () => {
   const { productSlug } = useParams<{ productSlug?: string }>();
@@ -26,8 +26,6 @@ const Checkout: React.FC = () => {
   const { toast } = useToast();
   const { settings } = useAsaas();
   const { addOrder } = useOrders();
-  
-  // Add a ref to track if an order has already been created for this session
   const orderCreatedRef = React.useRef(false);
 
   useEffect(() => {
@@ -35,23 +33,20 @@ const Checkout: React.FC = () => {
       setLoading(true);
       try {
         let product = null;
-        
         if (productSlug) {
           product = await getProductBySlug(productSlug);
-        } 
-        else if (products && products.length > 0) {
+        } else if (products && products.length > 0) {
           product = products[0];
         }
-        
+
         if (product) {
           logger.log("Produto encontrado:", product);
           setSelectedProduct(product);
         } else {
-          logger.log("Produto não encontrado");
           toast({
             title: "Produto não encontrado",
             description: productSlug 
-              ? `Não encontramos o produto "${productSlug}"`
+              ? `Não encontramos o produto \"${productSlug}\"`
               : "Nenhum produto disponível",
             variant: "destructive",
           });
@@ -88,36 +83,48 @@ const Checkout: React.FC = () => {
   const handlePayment = async (paymentData: any) => {
     logger.log("Iniciando processamento de pagamento com dados:", paymentData);
     setIsProcessing(true);
-    
+
     try {
-      if (!selectedProduct) {
-        throw new Error("Produto não disponível para finalizar o pedido");
-      }
-      
-      // Check if order was already created by the payment component
-      // If orderJustCreated is true, it means the order was created by the component itself
+      if (!selectedProduct) throw new Error("Produto não disponível para finalizar o pedido");
+
       if (paymentData.orderJustCreated || orderCreatedRef.current) {
-        logger.log("Ordem já foi criada anteriormente, navegando para a página de sucesso");
         orderCreatedRef.current = true;
-        
+
+        const normalized = resolveManualStatus(paymentData.status);
+        const finalStatus =
+          normalized === 'CONFIRMED' ? 'confirmed' :
+          normalized === 'REJECTED' ? 'rejected' :
+          'pending';
+
         toast({
-          title: "Pedido realizado com sucesso!",
-          description: paymentMethod === 'pix' 
-            ? "Utilize o QR code PIX para finalizar o pagamento." 
-            : "Seu pagamento foi processado.",
+          title: finalStatus === 'confirmed' ? "Pedido aprovado!" :
+                 finalStatus === 'pending' ? "Pedido pendente!" :
+                 "Pagamento recusado!",
+          description: finalStatus === 'confirmed'
+            ? "Seu pedido foi registrado com sucesso."
+            : finalStatus === 'pending'
+            ? "Seu pagamento está em análise ou aguardando ação."
+            : "Seu pagamento foi recusado. Tente novamente ou use outro método.",
           duration: 5000,
+          variant: finalStatus === 'rejected' ? 'destructive' : 'default'
         });
-        
-        navigate('/payment-success');
+
+        if (finalStatus === 'confirmed') {
+          navigate('/payment-success');
+        } else if (finalStatus === 'pending') {
+          navigate('/payment-pending');
+        } else {
+          navigate('/payment-failed');
+        }
+
         return;
       }
-      
+
       const paymentMethodEnum: PaymentMethod = paymentMethod === 'card' ? 'CREDIT_CARD' : 'PIX';
       const paymentStatusEnum: PaymentStatus = paymentData.status === 'confirmed' ? 'PAID' : 'PENDING';
-      
-      // Mark that we're creating an order
+
       orderCreatedRef.current = true;
-      
+
       const orderData = {
         customer: paymentData.customerData || {
           name: paymentData.customerName || "Cliente",
@@ -144,12 +151,11 @@ const Checkout: React.FC = () => {
           expirationDate: paymentData.pixDetails.expirationDate
         } : undefined
       };
-      
+
       logger.log("Criando pedido com dados:", orderData);
-      
       const newOrder = await addOrder(orderData);
       logger.log("Pedido criado com sucesso:", newOrder);
-      
+
       toast({
         title: "Pedido realizado com sucesso!",
         description: paymentMethod === 'pix' 
@@ -157,7 +163,7 @@ const Checkout: React.FC = () => {
           : "Seu pagamento foi processado.",
         duration: 5000,
       });
-      
+
       navigate('/payment-success');
     } catch (error) {
       logger.error('Erro ao processar pagamento:', error);
