@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -9,7 +8,7 @@ import VisitorStats from '@/components/dashboard/VisitorStats';
 import PaymentStats from '@/components/dashboard/PaymentStats';
 import VisitorsChart from '@/components/dashboard/VisitorsChart';
 import PaymentMethodsChart from '@/components/dashboard/PaymentMethodsChart';
-import { fetchDashboardStats, DashboardStats, formatCurrency, formatDate } from '@/utils/dashboardDataUtils';
+import { fetchDashboardStats, DashboardStats, formatCurrency } from '@/utils/dashboardDataUtils';
 
 const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -33,28 +32,26 @@ const Dashboard: React.FC = () => {
         setLoading(false);
       }
     }
-    
+
     loadDashboardData();
   }, [toast]);
 
-  // Find a product for quick checkout testing
   const testProductId = stats?.recentOrders[0]?.product_id || "1";
 
   return (
     <AdminLayout>
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
-        
-        <PaymentStats 
+
+        <PaymentStats
           pixGenerated={stats?.pixOrders || 0}
           pixCompleted={stats?.pixCompleted || 0}
           cardCaptured={stats?.cardOrders || 0}
           totalValue={stats?.totalRevenue || 0}
           loading={loading}
         />
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Stats Cards */}
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle>Produtos Cadastrados</CardTitle>
@@ -70,7 +67,7 @@ const Dashboard: React.FC = () => {
               </Link>
             </CardFooter>
           </Card>
-          
+
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle>Total de Pedidos</CardTitle>
@@ -90,27 +87,30 @@ const Dashboard: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <VisitorsChart visitorsData={stats?.visitorsData || []} loading={loading} />
-          <PaymentMethodsChart 
-            data={stats?.paymentMethodsDistribution || []} 
-            loading={loading} 
-          />
+          <PaymentMethodsChart data={stats?.paymentMethodsDistribution || []} loading={loading} />
         </div>
-        
-        {/* Test Checkout Buttons */}
+
+        {/* Test Buttons + PIX Config Link */}
         <div className="flex flex-wrap gap-4">
           <Link to="/checkout/test-product">
             <Button className="bg-blue-600 hover:bg-blue-700">
               Testar Checkout
             </Button>
           </Link>
-          
+
           <Link to={`/quick-checkout/${testProductId}`}>
             <Button className="bg-blue-600 hover:bg-blue-700">
               Testar Checkout Rápido
             </Button>
           </Link>
+
+          <Link to="/admin/pix-settings">
+            <Button variant="outline">
+              Editar PIX Manual
+            </Button>
+          </Link>
         </div>
-        
+
         {/* Recent Orders */}
         <Card className="shadow-sm">
           <CardHeader>
@@ -133,10 +133,10 @@ const Dashboard: React.FC = () => {
                       <div className="text-right">
                         <p className="font-medium">{formatCurrency(Number(order.price))}</p>
                         <p className={
-                          order.status === 'Pago' 
-                            ? 'text-sm text-green-600' 
-                            : order.status === 'Recusado' 
-                              ? 'text-sm text-red-600' 
+                          order.status === 'Pago'
+                            ? 'text-sm text-green-600'
+                            : order.status === 'Recusado'
+                              ? 'text-sm text-red-600'
                               : 'text-sm text-amber-600'
                         }>
                           {order.status}

@@ -110,7 +110,7 @@ const Checkout: React.FC = () => {
         });
 
         if (paymentMethod === 'pix') {
-          navigate('/pix-payment-manual', { state: { orderData: paymentData } });
+          navigate(`/pix-payment/${selectedProduct.slug}`, { state: { orderData: paymentData } });
         } else if (finalStatus === 'confirmed') {
           navigate('/payment-success', { state: { orderData: paymentData } });
         } else if (finalStatus === 'pending') {

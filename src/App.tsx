@@ -1,4 +1,3 @@
-
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 // Contexts
@@ -26,10 +25,10 @@ import QuickCheckout from './pages/QuickCheckout';
 import PaymentFailed from './pages/PaymentFailed';
 import PaymentSuccess from './pages/PaymentSuccess';
 import PixPaymentManual from './pages/PixPaymentManual';
-import PaymentPending from './pages/PaymentPending'; // Importe o componente que você acabou de criar
+import PaymentPending from './pages/PaymentPending';
+import PixSettings from './pages/admin/PixSettings';
 
-
-// Component imports
+// Components
 import { Toaster } from './components/ui/toaster';
 
 function App() {
@@ -42,14 +41,15 @@ function App() {
               <PixelProvider>
                 <CheckoutCustomizationProvider>
                   <Routes>
-                    {/* Redirecionar página raiz para login admin (pode alterar para landing depois) */}
+                    {/* Redirecionar página raiz para login admin */}
                     <Route path="/" element={<Navigate to="/admin/login" replace />} />
 
+                    {/* Páginas gerais */}
                     <Route path="/index" element={<Index />} />
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/customers" element={<Customers />} />
 
-                    {/* Admin Routes */}
+                    {/* Rotas administrativas */}
                     <Route path="/admin/login" element={<Login />} />
                     <Route path="/admin/dashboard" element={<AdminDashboard />} />
                     <Route path="/admin/products" element={<Products />} />
@@ -57,23 +57,28 @@ function App() {
                     <Route path="/admin/settings/payment" element={<PaymentSettings />} />
                     <Route path="/admin/pixel-settings" element={<PixelSettings />} />
                     <Route path="/admin/checkout-customization" element={<CheckoutCustomization />} />
-                    
-                    {/* Redirecionamentos antigos */}
+                    <Route path="/admin/pix-settings" element={<PixSettings />} />
+
+                    {/* Redirecionamentos antigos para rotas atualizadas */}
                     <Route path="/admin/asaas-settings" element={<Navigate to="/admin/settings/payment" replace />} />
                     <Route path="/admin/payments" element={<Navigate to="/admin/settings/payment" replace />} />
                     <Route path="/payments" element={<Navigate to="/admin/settings/payment" replace />} />
 
-                    {/* Checkout Routes */}
+                    {/* Rotas de checkout */}
                     <Route path="/checkout" element={<Checkout />} />
                     <Route path="/checkout/:productSlug" element={<Checkout />} />
                     <Route path="/quick-checkout/:productId" element={<QuickCheckout />} />
                     <Route path="/payment-failed" element={<PaymentFailed />} />
                     <Route path="/payment-success" element={<PaymentSuccess />} />
-                    <Route path="/pix-payment-manual" element={<PixPaymentManual />} />
                     <Route path="/payment-pending" element={<PaymentPending />} />
 
+                    {/* Rota de pagamento PIX manual com slug */}
+                    <Route path="/pix-payment/:productSlug" element={<PixPaymentManual />} />
 
-                    {/* Rota de fallback */}
+                    {/* Redirecionar rota incorreta (sem slug) para o checkout */}
+                    <Route path="/pix-payment-manual" element={<Navigate to="/checkout" replace />} />
+
+                    {/* Página 404 */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                   <Toaster />

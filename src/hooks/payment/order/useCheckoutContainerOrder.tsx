@@ -35,7 +35,7 @@ interface UseCheckoutOrderProps {
   productDetails: ProductDetailsType;
   handlePayment: (result: {
     orderId: number;
-    status: PaymentStatus; // ✅ corrigido aqui
+    status: PaymentStatus;
     paymentMethod: PaymentMethod;
     cardDetails?: CardDetails;
     pixDetails?: PixDetails;
