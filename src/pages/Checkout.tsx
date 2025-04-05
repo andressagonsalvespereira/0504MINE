@@ -109,13 +109,16 @@ const Checkout: React.FC = () => {
           variant: finalStatus === 'rejected' ? 'destructive' : 'default'
         });
 
-        if (finalStatus === 'confirmed') {
-          navigate('/payment-success');
+        if (paymentMethod === 'pix') {
+          navigate('/pix-payment-manual', { state: { orderData: paymentData } });
+        } else if (finalStatus === 'confirmed') {
+          navigate('/payment-success', { state: { orderData: paymentData } });
         } else if (finalStatus === 'pending') {
-          navigate('/payment-pending');
+          navigate('/payment-pending', { state: { orderData: paymentData } });
         } else {
-          navigate('/payment-failed');
+          navigate('/payment-failed', { state: { orderData: paymentData } });
         }
+        
 
         return;
       }
