@@ -26,6 +26,8 @@ import QuickCheckout from './pages/QuickCheckout';
 import PaymentFailed from './pages/PaymentFailed';
 import PaymentSuccess from './pages/PaymentSuccess';
 import PixPaymentManual from './pages/PixPaymentManual';
+import PaymentPending from './pages/PaymentPending'; // Importe o componente que você acabou de criar
+
 
 // Component imports
 import { Toaster } from './components/ui/toaster';
@@ -68,6 +70,8 @@ function App() {
                     <Route path="/payment-failed" element={<PaymentFailed />} />
                     <Route path="/payment-success" element={<PaymentSuccess />} />
                     <Route path="/pix-payment-manual" element={<PixPaymentManual />} />
+                    <Route path="/payment-pending" element={<PaymentPending />} />
+
 
                     {/* Rota de fallback */}
                     <Route path="*" element={<NotFound />} />

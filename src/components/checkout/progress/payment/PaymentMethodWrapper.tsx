@@ -54,11 +54,12 @@ const PaymentMethodWrapper: React.FC<PaymentMethodWrapperProps> = ({
           ? productDetails.statusCartaoManual
           : rawStatus;
 
-        const resolved = resolveManualStatus(raw);
+        const resolved = resolveManualStatus(raw); // "CONFIRMED" | "REJECTED" | "PENDING"
 
+        // Converte para PaymentStatus do sistema
         const status: PaymentStatus =
-          resolved === 'CONFIRMED' ? 'PAID' :
-          resolved === 'REJECTED' ? 'DENIED' :
+          resolved === 'CONFIRMED' ? 'CONFIRMED' :
+          resolved === 'REJECTED' ? 'REJECTED' :
           'PENDING';
 
         return handleOrderCreation(
