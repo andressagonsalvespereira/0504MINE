@@ -28,14 +28,10 @@ const handler: Handler = async (event) => {
     console.log('Dados parseados do frontend:', body);
 
     const { customer_name: name, customer_email: email, customer_cpf: cpfCnpj, customer_phone: phone } = body;
-    const { price, payment_method } = body;
+    const { price = 19.9, payment_method = 'PIX', product_name = 'Assinatura Anual - CineFlick Card' } = body;
 
     if (!name || !email || !cpfCnpj) {
       return { statusCode: 400, body: JSON.stringify({ error: 'Nome, email e CPF/CNPJ são obrigatórios.' }) };
-    }
-
-    if (!price || payment_method !== 'PIX') {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Preço e método de pagamento PIX são obrigatórios.' }) };
     }
 
     const apiKey = process.env.ASAAS_API_KEY;
@@ -74,10 +70,10 @@ const handler: Handler = async (event) => {
 
     const asaasPaymentData = {
       customer: customerData.id,
-      billingType: 'PIX',
+      billingType: payment_method,
       value: parseFloat(price),
       dueDate: new Date().toISOString().split('T')[0],
-      description: body.product_name || 'Assinatura Anual - CineFlick Card',
+      description: product_name,
     };
     console.log('Dados enviados ao Asaas para criar pagamento:', asaasPaymentData);
 
