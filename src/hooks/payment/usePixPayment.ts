@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { PaymentResult, CustomerData } from '@/types/payment';
 import { AsaasSettings } from '@/types/asaas';
@@ -11,6 +10,7 @@ interface PixPaymentHookProps {
   isDigitalProduct?: boolean;
   customerData?: CustomerData;
   settings?: AsaasSettings;
+  productDetails?: any; // Adicionado para acessar os dados do produto
 }
 
 interface PixData {
@@ -25,7 +25,8 @@ export const usePixPayment = ({
   isSandbox,
   isDigitalProduct = false,
   customerData,
-  settings
+  settings,
+  productDetails, // Adicionado para usar os dados do produto
 }: PixPaymentHookProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,39 +45,60 @@ export const usePixPayment = ({
       
       logger.log("Generating PIX QR Code", { isSandbox, isDigitalProduct });
       
-      // In a real implementation, you would call your payment processor API
-      // This is just a simulation
-      const response = await new Promise<PaymentResult>((resolve) => {
-        setTimeout(() => {
-          resolve({
-            success: true,
-            method: 'pix',
-            paymentId: `pix_${Date.now()}`,
-            status: 'PENDING',
-            timestamp: new Date().toISOString(),
-            qrCode: "00020101021226890014br.gov.bcb.pix2567invoice-checkout.asaas.com/b/37968507FTYKJGX0J8VM52040000530398654041.005802BR5925LOJA TESTE ASAAS LTDA6009SAO PAULO62070503***6304433C",
-            qrCodeImage: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAADICAYAAACtWK6eAAAAAXNSR0IArs4c6QAAAFBlWElmTU0A",
-            expirationDate: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutes from now
-          });
-        }, 1500);
+      // Fazer a requisição para create-asaas-customer
+      const response = await fetch('/.netlify/functions/create-asaas-customer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customer_name: customerData?.name || "Cliente Desconhecido",
+          customer_email: customerData?.email || "cliente@desconhecido.com",
+          customer_cpf: customerData?.cpf || "00000000000",
+          customer_phone: customerData?.phone || "0000000000",
+          product_id: productDetails?.id || 4,
+          paymentMethod: 'PIX',
+          price: productDetails?.price || 19.9,
+          product_name: productDetails?.name || "Assinatura Anual - CineFlick Card"
+        }),
       });
-      
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to generate PIX QR Code: ${response.status} - ${errorText}`);
+      }
+
+      const paymentData = await response.json();
+      logger.log("Payment data from Asaas:", paymentData);
+
+      // Estrutura esperada do paymentData (baseado nos testes manuais bem-sucedidos)
+      const result: PaymentResult = {
+        success: true,
+        method: 'pix',
+        paymentId: paymentData.id || `pix_${Date.now()}`,
+        status: paymentData.status === 'PENDING' ? 'pending' : 'confirmed',
+        timestamp: new Date().toISOString(),
+        qrCode: paymentData.pix?.payload || "QR_CODE_NOT_AVAILABLE",
+        qrCodeImage: paymentData.pix?.qrCodeImage || "",
+        expirationDate: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutos
+      };
+
       // Update state with PIX data
       setPixData({
-        qrCode: response.qrCode,
-        qrCodeImage: response.qrCodeImage,
-        paymentId: response.paymentId,
-        expirationDate: response.expirationDate
+        qrCode: result.qrCode,
+        qrCodeImage: result.qrCodeImage,
+        paymentId: result.paymentId,
+        expirationDate: result.expirationDate
       });
       
       // Submit payment data to parent component
       if (onSubmit) {
-        await onSubmit(response);
+        await onSubmit(result);
       }
       
       logger.log("PIX QR Code generated successfully");
       
-      return response;
+      return result;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to generate PIX QR Code";
       logger.error("Error generating PIX QR Code:", err);
