@@ -16,6 +16,7 @@ const PixPaymentAsaas: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [product, setProduct] = useState<any>(null);
   const [paymentData, setPaymentData] = useState<any>(null);
+  const [qrCodeError, setQrCodeError] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -40,11 +41,18 @@ const PixPaymentAsaas: React.FC = () => {
 
         logger.log("PIX details from orderData:", orderData.pixDetails);
 
+        // Validar o qrCodeImage
+        const qrCodeImage = orderData.pixDetails.qrCodeImage;
+        if (!qrCodeImage || !qrCodeImage.startsWith("data:image/")) {
+          logger.error("qrCodeImage inválido ou ausente:", qrCodeImage);
+          setQrCodeError("Imagem do QR Code não disponível ou inválida.");
+        }
+
         // Os dados do QR code já foram obtidos por create-asaas-customer
         setPaymentData({
           pix: {
             payload: orderData.pixDetails.qrCode,
-            qrCodeImage: orderData.pixDetails.qrCodeImage,
+            qrCodeImage: qrCodeImage,
           },
         });
 
@@ -87,15 +95,19 @@ const PixPaymentAsaas: React.FC = () => {
           <CardTitle>Pagamento PIX via Asaas</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {paymentData.pix.qrCodeImage ? (
+          {qrCodeError ? (
+            <div className="text-center text-red-500">{qrCodeError}</div>
+          ) : (
             <img
               src={paymentData.pix.qrCodeImage}
               alt="QR Code PIX"
               className="mx-auto w-60 h-60 border rounded"
-              onError={(e) => logger.error("Erro ao carregar imagem do QR code:", e)}
+              onError={(e) => {
+                logger.error("Erro ao carregar imagem do QR code:", e);
+                setQrCodeError("Erro ao carregar a imagem do QR Code.");
+              }}
+              onLoad={() => logger.log("Imagem do QR code carregada com sucesso.")}
             />
-          ) : (
-            <div className="text-center text-red-500">Imagem do QR Code não disponível.</div>
           )}
           <div className="text-center">
             <p className="font-semibold">Escaneie o QR Code ou copie o código abaixo:</p>
