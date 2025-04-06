@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useProducts } from '@/contexts/ProductContext';
 import { useAsaas } from '@/contexts/AsaasContext';
 import { logger } from '@/utils/logger';
@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const PixPaymentAsaas: React.FC = () => {
   const { productSlug } = useParams<{ productSlug: string }>();
+  const { state } = useLocation(); // Obtém os dados passados via navigate
   const { getProductBySlug } = useProducts();
   const { settings } = useAsaas();
   const [loading, setLoading] = useState(true);
@@ -19,7 +20,7 @@ const PixPaymentAsaas: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const loadProductAndCreateCharge = async () => {
+    const loadProductAndPaymentData = async () => {
       try {
         if (!productSlug) throw new Error("Slug do produto não informado.");
         const foundProduct = await getProductBySlug(productSlug);
@@ -29,54 +30,25 @@ const PixPaymentAsaas: React.FC = () => {
         if (!settings?.asaasApiKey) throw new Error("Chave da API do Asaas não configurada.");
         logger.log("Produto encontrado:", foundProduct);
 
-        // Criar cliente via Netlify Function
-        const customerResponse = await fetch('/.netlify/functions/create-asaas-customer', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: 'Cliente PIX',
-            email: 'cliente@email.com',
-            cpfCnpj: '00000000000',
-            phone: '0000000000',
-            postalCode: '00000000',
-            address: 'Rua Exemplo',
-            addressNumber: '123',
-            complement: '',
-            province: 'Centro',
-          }),
-        });
+        // Usar os dados do pedido passados via state
+        const orderData = state?.orderData;
+        if (!orderData || !orderData.pixDetails) {
+          throw new Error("Dados do pagamento PIX não encontrados.");
+        }
 
-        const customerData = await customerResponse.json();
-        logger.log('Cliente criado:', customerData);
-
-        if (!customerData?.id) throw new Error('Erro ao criar cliente no Asaas.');
-
-        // Criar pagamento
-        const paymentResponse = await fetch('https://www.asaas.com/api/v3/payments', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'access_token': settings.asaasApiKey,
+        // Os dados do QR code já foram obtidos por create-asaas-customer
+        setPaymentData({
+          pix: {
+            payload: orderData.pixDetails.qrCode,
+            qrCodeImage: orderData.pixDetails.qrCodeImage,
           },
-          body: JSON.stringify({
-            customer: customerData.id,
-            billingType: 'PIX',
-            value: foundProduct.preco,
-            dueDate: new Date().toISOString().split('T')[0],
-          }),
         });
-
-        const paymentData = await paymentResponse.json();
-        logger.log('Cobrança gerada:', paymentData);
-
-        if (!paymentData?.pix) throw new Error('Erro ao gerar QR Code PIX no Asaas.');
-        setPaymentData(paymentData);
 
       } catch (error: any) {
-        logger.error("Erro ao gerar pagamento via Asaas:", error);
+        logger.error("Erro ao carregar dados do pagamento via Asaas:", error);
         toast({
-          title: "Erro ao gerar cobrança",
-          description: error.message || "Não foi possível iniciar o pagamento.",
+          title: "Erro ao carregar cobrança",
+          description: error.message || "Não foi possível carregar o pagamento.",
           variant: "destructive",
         });
         navigate('/payment-failed');
@@ -85,14 +57,14 @@ const PixPaymentAsaas: React.FC = () => {
       }
     };
 
-    loadProductAndCreateCharge();
-  }, [productSlug, getProductBySlug, settings, toast, navigate]);
+    loadProductAndPaymentData();
+  }, [productSlug, getProductBySlug, settings, state, toast, navigate]);
 
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[300px]">
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-        <span className="ml-2">Gerando cobrança via Asaas...</span>
+        <span className="ml-2">Carregando dados do pagamento...</span>
       </div>
     );
   }
