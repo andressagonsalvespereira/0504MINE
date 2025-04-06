@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const PixPaymentAsaas: React.FC = () => {
   const { productSlug } = useParams<{ productSlug: string }>();
-  const { state } = useLocation(); // Obtém os dados passados via navigate
+  const { state } = useLocation();
   const { getProductBySlug } = useProducts();
   const { settings } = useAsaas();
   const [loading, setLoading] = useState(true);
