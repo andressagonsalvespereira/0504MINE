@@ -1,7 +1,7 @@
 // netlify/functions/create-asaas-customer.ts
 import { Handler } from '@netlify/functions';
 
-const ASAAS_API_URL = 'https://sandbox.asaas.com/api/v3/customers';
+const ASAAS_API_URL = 'https://sandbox.asaas.com/api/v3/customers'; // Sandbox para criar clientes
 
 const handler: Handler = async (event) => {
   console.log('Requisição recebida:', { method: event.httpMethod, body: event.body });
@@ -26,7 +26,7 @@ const handler: Handler = async (event) => {
 
     console.log('Dados parseados do frontend:', body);
 
-    // Mapeia os campos do frontend para os nomes esperados
+    // Mapeia os campos do frontend
     const { customer_name: name, customer_email: email, customer_cpf: cpfCnpj, customer_phone: phone } = body;
 
     if (!name || !email || !cpfCnpj) {
@@ -60,14 +60,8 @@ const handler: Handler = async (event) => {
       body: JSON.stringify(asaasCustomerData),
     });
 
-    let data;
-    try {
-      data = await response.json();
-      console.log('Resposta do Asaas:', data);
-    } catch (jsonErr) {
-      console.error('Erro ao parsear resposta do Asaas:', jsonErr.message, 'Resposta crua:', await response.text());
-      return { statusCode: 500, body: JSON.stringify({ error: 'Resposta do Asaas não é JSON válido', details: jsonErr.message }) };
-    }
+    const data = await response.json();
+    console.log('Resposta do Asaas:', data);
 
     if (!response.ok) {
       return { statusCode: response.status, body: JSON.stringify({ error: 'Erro ao criar cliente no Asaas', details: data }) };
