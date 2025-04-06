@@ -63,13 +63,25 @@ export const usePixPayment = ({
         }),
       });
 
+      logger.log("Response status:", response.status);
+      logger.log("Response ok:", response.ok);
+
       if (!response.ok) {
         const errorText = await response.text();
+        logger.error("Error response from create-asaas-customer:", errorText);
         throw new Error(`Failed to create payment: ${response.status} - ${errorText}`);
       }
 
       const paymentData = await response.json();
       logger.log("Payment data from Asaas:", paymentData);
+
+      // Garantir que qrCodeImage esteja no formato correto (data:image/png;base64,...)
+      const qrCodeImage = paymentData.pix?.qrCodeImage || paymentData.qrCodeImage || "";
+      const formattedQrCodeImage = qrCodeImage.startsWith("data:image/")
+        ? qrCodeImage
+        : qrCodeImage
+        ? `data:image/png;base64,${qrCodeImage}`
+        : "";
 
       // Estrutura esperada do PaymentResult
       const result: PaymentResult = {
@@ -79,9 +91,11 @@ export const usePixPayment = ({
         status: paymentData.status === 'PENDING' ? 'pending' : 'confirmed',
         timestamp: new Date().toISOString(),
         qrCode: paymentData.pix?.payload || paymentData.qrCode || "QR_CODE_NOT_AVAILABLE",
-        qrCodeImage: paymentData.pix?.qrCodeImage || paymentData.qrCodeImage || "",
-        expirationDate: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutos
+        qrCodeImage: formattedQrCodeImage,
+        expirationDate: paymentData.pix?.expirationDate || new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutos
       };
+
+      logger.log("Mapped PaymentResult:", result);
 
       // Update state with PIX data
       setPixData({
@@ -93,6 +107,7 @@ export const usePixPayment = ({
       
       // Submit payment data to parent component
       if (onSubmit) {
+        logger.log("Calling onSubmit with result:", result);
         await onSubmit(result);
       }
       
@@ -109,7 +124,8 @@ export const usePixPayment = ({
         variant: "destructive",
       });
       
-      throw err;
+      // Não rejeitar a promessa, apenas logar o erro
+      return null;
     } finally {
       setIsLoading(false);
     }

@@ -32,9 +32,13 @@ const PixPaymentAsaas: React.FC = () => {
 
         // Usar os dados do pedido passados via state
         const orderData = state?.orderData;
+        logger.log("Order data received via state:", orderData);
+
         if (!orderData || !orderData.pixDetails) {
           throw new Error("Dados do pagamento PIX não encontrados.");
         }
+
+        logger.log("PIX details from orderData:", orderData.pixDetails);
 
         // Os dados do QR code já foram obtidos por create-asaas-customer
         setPaymentData({
@@ -70,8 +74,11 @@ const PixPaymentAsaas: React.FC = () => {
   }
 
   if (!product || !paymentData?.pix) {
+    logger.error("Erro ao carregar dados do PIX:", { product, paymentData });
     return <div className="text-center text-red-500 mt-10">Erro ao carregar cobrança PIX.</div>;
   }
+
+  logger.log("Rendering PIX payment page with data:", paymentData);
 
   return (
     <div className="max-w-lg mx-auto mt-10">
@@ -80,11 +87,16 @@ const PixPaymentAsaas: React.FC = () => {
           <CardTitle>Pagamento PIX via Asaas</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <img
-            src={paymentData.pix.qrCodeImage}
-            alt="QR Code PIX"
-            className="mx-auto w-60 h-60 border rounded"
-          />
+          {paymentData.pix.qrCodeImage ? (
+            <img
+              src={paymentData.pix.qrCodeImage}
+              alt="QR Code PIX"
+              className="mx-auto w-60 h-60 border rounded"
+              onError={(e) => logger.error("Erro ao carregar imagem do QR code:", e)}
+            />
+          ) : (
+            <div className="text-center text-red-500">Imagem do QR Code não disponível.</div>
+          )}
           <div className="text-center">
             <p className="font-semibold">Escaneie o QR Code ou copie o código abaixo:</p>
             <p className="bg-gray-100 p-2 rounded break-all text-sm">{paymentData.pix.payload}</p>
