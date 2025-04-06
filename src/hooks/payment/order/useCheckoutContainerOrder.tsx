@@ -111,7 +111,6 @@ export const useCheckoutOrder = ({
 
       logger.log('[useCheckoutOrder] 🧾 Dados do cliente:', customer);
 
-      // Ignorar manualCardStatus para PIX
       const isPixPayment = !cardDetails && pixDetails;
       const resolved = (formState.useCustomProcessing && !isPixPayment)
         ? resolveManualStatus(formState.manualCardStatus)
@@ -140,7 +139,7 @@ export const useCheckoutOrder = ({
         cardDetails,
         pixDetails: isPixPayment ? {
           qrCode: pixDetails?.qrCode || "QR_CODE_NOT_AVAILABLE",
-          qrCodeImage: pixDetails?.qrCodeImage || "", // Salvar no Supabase
+          qrCodeImage: pixDetails?.qrCodeImage || "",
           expirationDate: pixDetails?.expirationDate || new Date().toISOString()
         } : undefined,
         orderDate: new Date().toISOString(),
@@ -149,6 +148,9 @@ export const useCheckoutOrder = ({
       });
 
       logger.log('[useCheckoutOrder] ✅ Pedido criado com sucesso! ID:', newOrder.id);
+
+      // Salvar o orderId no localStorage para recuperação futura
+      localStorage.setItem('lastOrderId', newOrder.id!.toString());
 
       toast({
         title: 'Pedido criado com sucesso!',

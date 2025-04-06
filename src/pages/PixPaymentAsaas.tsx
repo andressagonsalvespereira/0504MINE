@@ -2,22 +2,24 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useProducts } from '@/contexts/ProductContext';
 import { useAsaas } from '@/contexts/AsaasContext';
+import { useOrders } from '@/contexts/OrderContext'; // Adicionar contexto para buscar pedidos
 import { logger } from '@/utils/logger';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import QRCode from 'qrcode.react'; // Biblioteca para gerar QR code dinamicamente
+import QRCode from 'qrcode.react';
 
 const PixPaymentAsaas: React.FC = () => {
   const { productSlug } = useParams<{ productSlug: string }>();
   const { state } = useLocation();
   const { getProductBySlug } = useProducts();
+  const { getOrderById } = useOrders(); // Função para buscar pedido pelo ID
   const { settings } = useAsaas();
   const [loading, setLoading] = useState(true);
   const [product, setProduct] = useState<any>(null);
   const [paymentData, setPaymentData] = useState<any>(null);
-  const [qrCodeError, setQrCodeError] = useState<string | null>(null);
+  const [useFallback, setUseFallback] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -33,11 +35,19 @@ const PixPaymentAsaas: React.FC = () => {
         logger.log("Produto encontrado:", foundProduct);
 
         // Usar os dados do pedido passados via state
-        const orderData = state?.orderData;
+        let orderData = state?.orderData;
         logger.log("Order data received via state:", orderData);
 
+        // Se o state.orderData não estiver disponível (ex.: após recarregamento), buscar no Supabase
         if (!orderData || !orderData.pixDetails) {
-          throw new Error("Dados do pagamento PIX não encontrados.");
+          const orderId = localStorage.getItem('lastOrderId'); // Supondo que você salvou o orderId
+          if (!orderId) throw new Error("ID do pedido não encontrado.");
+          
+          const order = await getOrderById(orderId);
+          if (!order || !order.pixDetails) {
+            throw new Error("Dados do pagamento PIX não encontrados no Supabase.");
+          }
+          orderData = order;
         }
 
         logger.log("PIX details from orderData:", orderData.pixDetails);
@@ -45,11 +55,10 @@ const PixPaymentAsaas: React.FC = () => {
         // Validar o qrCodeImage
         const qrCodeImage = orderData.pixDetails.qrCodeImage;
         if (!qrCodeImage || !qrCodeImage.startsWith("data:image/")) {
-          logger.error("qrCodeImage inválido ou ausente:", qrCodeImage);
-          setQrCodeError("Imagem do QR Code não disponível ou inválida. Usando QR Code gerado dinamicamente.");
+          logger.warn("qrCodeImage inválido ou ausente, usando fallback:", qrCodeImage);
+          setUseFallback(true);
         }
 
-        // Os dados do QR code já foram obtidos por create-asaas-customer
         setPaymentData({
           pix: {
             payload: orderData.pixDetails.qrCode,
@@ -71,7 +80,7 @@ const PixPaymentAsaas: React.FC = () => {
     };
 
     loadProductAndPaymentData();
-  }, [productSlug, getProductBySlug, settings, state, toast, navigate]);
+  }, [productSlug, getProductBySlug, getOrderById, settings, state, toast, navigate]);
 
   if (loading) {
     return (
@@ -96,7 +105,7 @@ const PixPaymentAsaas: React.FC = () => {
           <CardTitle>Pagamento PIX via Asaas</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {qrCodeError ? (
+          {useFallback || !paymentData.pix.qrCodeImage ? (
             <div className="mx-auto w-60 h-60 flex items-center justify-center">
               <QRCode
                 value={paymentData.pix.payload}
@@ -112,7 +121,7 @@ const PixPaymentAsaas: React.FC = () => {
               className="mx-auto w-60 h-60 border rounded"
               onError={(e) => {
                 logger.error("Erro ao carregar imagem do QR code:", e);
-                setQrCodeError("Erro ao carregar a imagem do QR Code. Usando QR Code gerado dinamicamente.");
+                setUseFallback(true);
               }}
               onLoad={() => logger.log("Imagem do QR code carregada com sucesso.")}
             />
