@@ -26,7 +26,9 @@ const handler: Handler = async (event) => {
 
     console.log('Dados parseados do frontend:', body);
 
-    const { name, email, cpfCnpj, phone } = body;
+    // Mapeia os campos do frontend para os nomes esperados
+    const { customer_name: name, customer_email: email, customer_cpf: cpfCnpj, customer_phone: phone } = body;
+
     if (!name || !email || !cpfCnpj) {
       return { statusCode: 400, body: JSON.stringify({ error: 'Nome, email e CPF/CNPJ são obrigatórios.' }) };
     }
