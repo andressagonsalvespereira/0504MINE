@@ -4,6 +4,8 @@ import { Handler } from '@netlify/functions';
 const ASAAS_API_URL = 'https://sandbox.asaas.com/api/v3/customers';
 
 const handler: Handler = async (event) => {
+  console.log('Requisição recebida:', { method: event.httpMethod, body: event.body });
+
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Método não permitido. Use POST.' }) };
   }
@@ -13,8 +15,16 @@ const handler: Handler = async (event) => {
   }
 
   try {
-    const body = JSON.parse(event.body);
-    console.log('Dados recebidos do frontend:', body);
+    let body;
+    try {
+      console.log('Tentando parsear body:', event.body);
+      body = JSON.parse(event.body);
+    } catch (parseErr) {
+      console.error('Erro ao parsear body:', parseErr.message, 'Body recebido:', event.body);
+      return { statusCode: 400, body: JSON.stringify({ error: 'Corpo da requisição não é JSON válido', details: parseErr.message }) };
+    }
+
+    console.log('Dados parseados do frontend:', body);
 
     const { name, email, cpfCnpj, phone } = body;
     if (!name || !email || !cpfCnpj) {
@@ -48,8 +58,14 @@ const handler: Handler = async (event) => {
       body: JSON.stringify(asaasCustomerData),
     });
 
-    const data = await response.json();
-    console.log('Resposta do Asaas:', data);
+    let data;
+    try {
+      data = await response.json();
+      console.log('Resposta do Asaas:', data);
+    } catch (jsonErr) {
+      console.error('Erro ao parsear resposta do Asaas:', jsonErr.message, 'Resposta crua:', await response.text());
+      return { statusCode: 500, body: JSON.stringify({ error: 'Resposta do Asaas não é JSON válido', details: jsonErr.message }) };
+    }
 
     if (!response.ok) {
       return { statusCode: response.status, body: JSON.stringify({ error: 'Erro ao criar cliente no Asaas', details: data }) };
