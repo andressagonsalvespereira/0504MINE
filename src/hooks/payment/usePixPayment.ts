@@ -78,8 +78,8 @@ export const usePixPayment = ({
         paymentId: paymentData.id || `pix_${Date.now()}`,
         status: paymentData.status === 'PENDING' ? 'pending' : 'confirmed',
         timestamp: new Date().toISOString(),
-        qrCode: paymentData.pix?.payload || "QR_CODE_NOT_AVAILABLE",
-        qrCodeImage: paymentData.pix?.qrCodeImage || "",
+        qrCode: paymentData.pix?.payload || paymentData.qrCode || "QR_CODE_NOT_AVAILABLE",
+        qrCodeImage: paymentData.pix?.qrCodeImage || paymentData.qrCodeImage || "",
         expirationDate: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutos
       };
 

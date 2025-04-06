@@ -109,17 +109,18 @@ const Checkout: React.FC = () => {
           variant: finalStatus === 'rejected' ? 'destructive' : 'default'
         });
 
-        if (paymentMethod === 'pix' && settings?.usePixAsaas && settings?.asaasApiKey) {
-          console.log("✅ Redirecionando para pagamento via Asaas");
-          navigate(`/pix-asaas/${selectedProduct.slug}`, { state: { orderData: paymentData } });
-          return;
-        }
-
+        // Priorizar redirecionamento para PIX
         if (paymentMethod === 'pix') {
-          navigate(`/pix-payment/${selectedProduct.slug}`, { state: { orderData: paymentData } });
+          if (settings?.usePixAsaas && settings?.asaasApiKey) {
+            console.log("✅ Redirecionando para pagamento via Asaas");
+            navigate(`/pix-asaas/${selectedProduct.slug}`, { state: { orderData: paymentData } });
+          } else {
+            navigate(`/pix-payment/${selectedProduct.slug}`, { state: { orderData: paymentData } });
+          }
           return;
         }
 
+        // Fluxo para cartão permanece inalterado
         if (finalStatus === 'confirmed') {
           navigate('/payment-success', { state: { orderData: paymentData } });
         } else if (finalStatus === 'pending') {
