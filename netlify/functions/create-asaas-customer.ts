@@ -1,8 +1,8 @@
 // netlify/functions/create-asaas-customer.ts
 import { Handler } from '@netlify/functions';
 
-const ASAAS_API_URL_CUSTOMERS = 'https://sandbox.asaas.com/api/v3/customers'; // Criar cliente
-const ASAAS_API_URL_PAYMENTS = 'https://sandbox.asaas.com/api/v3/payments'; // Criar pagamento
+const ASAAS_API_URL_CUSTOMERS = 'https://sandbox.asaas.com/api/v3/customers';
+const ASAAS_API_URL_PAYMENTS = 'https://sandbox.asaas.com/api/v3/payments';
 
 const handler: Handler = async (event) => {
   console.log('Requisição recebida:', { method: event.httpMethod, body: event.body });
@@ -27,7 +27,6 @@ const handler: Handler = async (event) => {
 
     console.log('Dados parseados do frontend:', body);
 
-    // Mapeia os campos do frontend para criar o cliente
     const { customer_name: name, customer_email: email, customer_cpf: cpfCnpj, customer_phone: phone } = body;
     const { price, payment_method } = body;
 
@@ -49,7 +48,6 @@ const handler: Handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'CPF ou CNPJ inválido.' }) };
     }
 
-    // 1. Criar o cliente
     const asaasCustomerData = {
       name,
       email,
@@ -74,12 +72,11 @@ const handler: Handler = async (event) => {
       return { statusCode: customerResponse.status, body: JSON.stringify({ error: 'Erro ao criar cliente no Asaas', details: customerData }) };
     }
 
-    // 2. Criar o pagamento PIX
     const asaasPaymentData = {
-      customer: customerData.id, // ID do cliente criado
+      customer: customerData.id,
       billingType: 'PIX',
-      value: parseFloat(price), // Converte para número
-      dueDate: new Date().toISOString().split('T')[0], // Data de vencimento (hoje)
+      value: parseFloat(price),
+      dueDate: new Date().toISOString().split('T')[0],
       description: body.product_name || 'Assinatura Anual - CineFlick Card',
     };
     console.log('Dados enviados ao Asaas para criar pagamento:', asaasPaymentData);
