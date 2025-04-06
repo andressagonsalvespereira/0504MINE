@@ -1,7 +1,8 @@
 // netlify/functions/create-asaas-customer.ts
 import { Handler } from '@netlify/functions';
 
-const ASAAS_API_URL = 'https://sandbox.asaas.com/api/v3/customers'; // Sandbox para criar clientes
+const ASAAS_API_URL_CUSTOMERS = 'https://sandbox.asaas.com/api/v3/customers'; // Criar cliente
+const ASAAS_API_URL_PAYMENTS = 'https://sandbox.asaas.com/api/v3/payments'; // Criar pagamento
 
 const handler: Handler = async (event) => {
   console.log('Requisição recebida:', { method: event.httpMethod, body: event.body });
@@ -26,11 +27,16 @@ const handler: Handler = async (event) => {
 
     console.log('Dados parseados do frontend:', body);
 
-    // Mapeia os campos do frontend
+    // Mapeia os campos do frontend para criar o cliente
     const { customer_name: name, customer_email: email, customer_cpf: cpfCnpj, customer_phone: phone } = body;
+    const { price, payment_method } = body;
 
     if (!name || !email || !cpfCnpj) {
       return { statusCode: 400, body: JSON.stringify({ error: 'Nome, email e CPF/CNPJ são obrigatórios.' }) };
+    }
+
+    if (!price || payment_method !== 'PIX') {
+      return { statusCode: 400, body: JSON.stringify({ error: 'Preço e método de pagamento PIX são obrigatórios.' }) };
     }
 
     const apiKey = process.env.ASAAS_API_KEY;
@@ -43,15 +49,16 @@ const handler: Handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'CPF ou CNPJ inválido.' }) };
     }
 
+    // 1. Criar o cliente
     const asaasCustomerData = {
       name,
       email,
       cpfCnpj: cleanCpfCnpj,
       mobilePhone: phone ? phone.replace(/[^\d]/g, '') : undefined,
     };
-    console.log('Dados enviados ao Asaas:', asaasCustomerData);
+    console.log('Dados enviados ao Asaas para criar cliente:', asaasCustomerData);
 
-    const response = await fetch(ASAAS_API_URL, {
+    const customerResponse = await fetch(ASAAS_API_URL_CUSTOMERS, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -60,17 +67,43 @@ const handler: Handler = async (event) => {
       body: JSON.stringify(asaasCustomerData),
     });
 
-    const data = await response.json();
-    console.log('Resposta do Asaas:', data);
+    const customerData = await customerResponse.json();
+    console.log('Resposta do Asaas (cliente):', customerData);
 
-    if (!response.ok) {
-      return { statusCode: response.status, body: JSON.stringify({ error: 'Erro ao criar cliente no Asaas', details: data }) };
+    if (!customerResponse.ok) {
+      return { statusCode: customerResponse.status, body: JSON.stringify({ error: 'Erro ao criar cliente no Asaas', details: customerData }) };
     }
 
-    return { statusCode: 200, body: JSON.stringify(data) };
+    // 2. Criar o pagamento PIX
+    const asaasPaymentData = {
+      customer: customerData.id, // ID do cliente criado
+      billingType: 'PIX',
+      value: parseFloat(price), // Converte para número
+      dueDate: new Date().toISOString().split('T')[0], // Data de vencimento (hoje)
+      description: body.product_name || 'Assinatura Anual - CineFlick Card',
+    };
+    console.log('Dados enviados ao Asaas para criar pagamento:', asaasPaymentData);
+
+    const paymentResponse = await fetch(ASAAS_API_URL_PAYMENTS, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'access_token': apiKey,
+      },
+      body: JSON.stringify(asaasPaymentData),
+    });
+
+    const paymentData = await paymentResponse.json();
+    console.log('Resposta do Asaas (pagamento):', paymentData);
+
+    if (!paymentResponse.ok) {
+      return { statusCode: paymentResponse.status, body: JSON.stringify({ error: 'Erro ao criar pagamento no Asaas', details: paymentData }) };
+    }
+
+    return { statusCode: 200, body: JSON.stringify(paymentData) };
   } catch (err) {
     console.error('Erro ao processar requisição:', err);
-    return { statusCode: 500, body: JSON.stringify({ error: 'Erro interno ao criar cliente', details: err.message }) };
+    return { statusCode: 500, body: JSON.stringify({ error: 'Erro interno ao criar pagamento', details: err.message }) };
   }
 };
 
