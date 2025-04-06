@@ -71,25 +71,6 @@ export const usePixPayment = ({
       const paymentData = await response.json();
       logger.log("Payment data from Asaas:", paymentData);
 
-      // Fazer uma requisição adicional para obter o QR code
-      let qrCodeData = { payload: "QR_CODE_NOT_AVAILABLE", qrCodeImage: "" };
-      if (paymentData.id) {
-        const qrCodeResponse = await fetch(`https://sandbox.asaas.com/api/v3/payments/${paymentData.id}/pixQrCode`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'access_token': settings?.asaasApiKey || '',
-          },
-        });
-
-        if (qrCodeResponse.ok) {
-          qrCodeData = await qrCodeResponse.json();
-          logger.log("PIX QR Code data:", qrCodeData);
-        } else {
-          logger.warn("Failed to fetch PIX QR Code, using fallback values");
-        }
-      }
-
       // Estrutura esperada do PaymentResult
       const result: PaymentResult = {
         success: true,
@@ -97,8 +78,8 @@ export const usePixPayment = ({
         paymentId: paymentData.id || `pix_${Date.now()}`,
         status: paymentData.status === 'PENDING' ? 'pending' : 'confirmed',
         timestamp: new Date().toISOString(),
-        qrCode: qrCodeData.payload || "QR_CODE_NOT_AVAILABLE",
-        qrCodeImage: qrCodeData.qrCodeImage || "",
+        qrCode: paymentData.pix?.payload || "QR_CODE_NOT_AVAILABLE",
+        qrCodeImage: paymentData.pix?.qrCodeImage || "",
         expirationDate: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutos
       };
 

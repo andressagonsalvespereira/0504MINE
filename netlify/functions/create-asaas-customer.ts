@@ -6,7 +6,7 @@ const ASAAS_API_URL_PAYMENTS = 'https://sandbox.asaas.com/api/v3/payments';
 
 const handler: Handler = async (event) => {
   console.log('Requisição recebida:', { method: event.httpMethod, body: event.body });
-  console.log('Versão atualizada para criar pagamento PIX - 2025-04-06'); // Adicionado para forçar deploy
+  console.log('Versão atualizada para criar pagamento PIX - 2025-04-06');
 
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Método não permitido. Use POST.' }) };
@@ -94,7 +94,35 @@ const handler: Handler = async (event) => {
       return { statusCode: paymentResponse.status, body: JSON.stringify({ error: 'Erro ao criar pagamento no Asaas', details: paymentData }) };
     }
 
-    return { statusCode: 200, body: JSON.stringify(paymentData) };
+    // Fazer uma requisição adicional para obter o QR code
+    let qrCodeData = { payload: "QR_CODE_NOT_AVAILABLE", qrCodeImage: "" };
+    if (paymentData.id) {
+      const qrCodeResponse = await fetch(`${ASAAS_API_URL_PAYMENTS}/${paymentData.id}/pixQrCode`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'access_token': apiKey,
+        },
+      });
+
+      if (qrCodeResponse.ok) {
+        qrCodeData = await qrCodeResponse.json();
+        console.log('PIX QR Code data:', qrCodeData);
+      } else {
+        console.warn('Failed to fetch PIX QR Code, using fallback values');
+      }
+    }
+
+    // Adicionar os dados do QR code à resposta
+    const responseWithQrCode = {
+      ...paymentData,
+      pix: {
+        payload: qrCodeData.payload || "QR_CODE_NOT_AVAILABLE",
+        qrCodeImage: qrCodeData.qrCodeImage || "",
+      },
+    };
+
+    return { statusCode: 200, body: JSON.stringify(responseWithQrCode) };
   } catch (err) {
     console.error('Erro ao processar requisição:', err);
     return { statusCode: 500, body: JSON.stringify({ error: 'Erro interno ao criar pagamento', details: err.message }) };
