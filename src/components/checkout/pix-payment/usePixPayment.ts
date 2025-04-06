@@ -116,7 +116,8 @@ export const usePixPayment = ({
         variant: "destructive",
       });
       
-      throw err;
+      // Não rejeitar a promessa, apenas logar o erro
+      return null;
     } finally {
       setIsLoading(false);
     }
