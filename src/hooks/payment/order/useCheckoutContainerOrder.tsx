@@ -138,7 +138,11 @@ export const useCheckoutOrder = ({
         paymentStatus: finalStatus,
         paymentId,
         cardDetails,
-        pixDetails,
+        pixDetails: isPixPayment ? {
+          qrCode: pixDetails?.qrCode || "QR_CODE_NOT_AVAILABLE",
+          qrCodeImage: pixDetails?.qrCodeImage || "", // Salvar no Supabase
+          expirationDate: pixDetails?.expirationDate || new Date().toISOString()
+        } : undefined,
         orderDate: new Date().toISOString(),
         deviceType,
         isDigitalProduct: productDetails.isDigital,

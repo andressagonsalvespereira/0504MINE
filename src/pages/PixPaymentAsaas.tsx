@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import QRCode from 'qrcode.react'; // Biblioteca para gerar QR code dinamicamente
 
 const PixPaymentAsaas: React.FC = () => {
   const { productSlug } = useParams<{ productSlug: string }>();
@@ -45,7 +46,7 @@ const PixPaymentAsaas: React.FC = () => {
         const qrCodeImage = orderData.pixDetails.qrCodeImage;
         if (!qrCodeImage || !qrCodeImage.startsWith("data:image/")) {
           logger.error("qrCodeImage inválido ou ausente:", qrCodeImage);
-          setQrCodeError("Imagem do QR Code não disponível ou inválida.");
+          setQrCodeError("Imagem do QR Code não disponível ou inválida. Usando QR Code gerado dinamicamente.");
         }
 
         // Os dados do QR code já foram obtidos por create-asaas-customer
@@ -96,7 +97,14 @@ const PixPaymentAsaas: React.FC = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           {qrCodeError ? (
-            <div className="text-center text-red-500">{qrCodeError}</div>
+            <div className="mx-auto w-60 h-60 flex items-center justify-center">
+              <QRCode
+                value={paymentData.pix.payload}
+                size={240}
+                level="H"
+                includeMargin={true}
+              />
+            </div>
           ) : (
             <img
               src={paymentData.pix.qrCodeImage}
@@ -104,7 +112,7 @@ const PixPaymentAsaas: React.FC = () => {
               className="mx-auto w-60 h-60 border rounded"
               onError={(e) => {
                 logger.error("Erro ao carregar imagem do QR code:", e);
-                setQrCodeError("Erro ao carregar a imagem do QR Code.");
+                setQrCodeError("Erro ao carregar a imagem do QR Code. Usando QR Code gerado dinamicamente.");
               }}
               onLoad={() => logger.log("Imagem do QR code carregada com sucesso.")}
             />
