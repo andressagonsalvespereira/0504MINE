@@ -6,6 +6,7 @@ const ASAAS_API_URL_PAYMENTS = 'https://sandbox.asaas.com/api/v3/payments';
 
 const handler: Handler = async (event) => {
   console.log('Requisição recebida:', { method: event.httpMethod, body: event.body });
+  console.log('Versão atualizada para criar pagamento PIX - 2025-04-06'); // Adicionado para forçar deploy
 
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Método não permitido. Use POST.' }) };
