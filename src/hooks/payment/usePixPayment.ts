@@ -10,7 +10,7 @@ interface PixPaymentHookProps {
   isDigitalProduct?: boolean;
   customerData?: CustomerData;
   settings?: AsaasSettings;
-  productDetails?: any; // Adicionado para acessar os dados do produto
+  productDetails?: any;
 }
 
 interface PixData {
@@ -26,7 +26,7 @@ export const usePixPayment = ({
   isDigitalProduct = false,
   customerData,
   settings,
-  productDetails, // Adicionado para usar os dados do produto
+  productDetails,
 }: PixPaymentHookProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,21 +65,40 @@ export const usePixPayment = ({
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to generate PIX QR Code: ${response.status} - ${errorText}`);
+        throw new Error(`Failed to create payment: ${response.status} - ${errorText}`);
       }
 
       const paymentData = await response.json();
       logger.log("Payment data from Asaas:", paymentData);
 
-      // Estrutura esperada do paymentData (baseado nos testes manuais bem-sucedidos)
+      // Fazer uma requisição adicional para obter o QR code
+      let qrCodeData = { payload: "QR_CODE_NOT_AVAILABLE", qrCodeImage: "" };
+      if (paymentData.id) {
+        const qrCodeResponse = await fetch(`https://sandbox.asaas.com/api/v3/payments/${paymentData.id}/pixQrCode`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'access_token': settings?.asaasApiKey || '',
+          },
+        });
+
+        if (qrCodeResponse.ok) {
+          qrCodeData = await qrCodeResponse.json();
+          logger.log("PIX QR Code data:", qrCodeData);
+        } else {
+          logger.warn("Failed to fetch PIX QR Code, using fallback values");
+        }
+      }
+
+      // Estrutura esperada do PaymentResult
       const result: PaymentResult = {
         success: true,
         method: 'pix',
         paymentId: paymentData.id || `pix_${Date.now()}`,
         status: paymentData.status === 'PENDING' ? 'pending' : 'confirmed',
         timestamp: new Date().toISOString(),
-        qrCode: paymentData.pix?.payload || "QR_CODE_NOT_AVAILABLE",
-        qrCodeImage: paymentData.pix?.qrCodeImage || "",
+        qrCode: qrCodeData.payload || "QR_CODE_NOT_AVAILABLE",
+        qrCodeImage: qrCodeData.qrCodeImage || "",
         expirationDate: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutos
       };
 
@@ -97,7 +116,6 @@ export const usePixPayment = ({
       }
       
       logger.log("PIX QR Code generated successfully");
-      
       return result;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to generate PIX QR Code";
