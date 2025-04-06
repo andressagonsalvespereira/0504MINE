@@ -15,6 +15,10 @@ export interface AsaasSettings {
   manualPixPage: boolean;
   manualPaymentConfig: boolean;
   manualCardStatus: ManualCardStatus;
+
+  // ✅ Novos campos para integração Asaas via PIX
+  usePixAsaas: boolean;
+  asaasApiKey: string;
 }
 
 export interface AsaasApiResponse<T> {

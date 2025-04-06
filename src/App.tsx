@@ -27,6 +27,8 @@ import PaymentSuccess from './pages/PaymentSuccess';
 import PixPaymentManual from './pages/PixPaymentManual';
 import PaymentPending from './pages/PaymentPending';
 import PixSettings from './pages/admin/PixSettings';
+import PixPaymentAsaas from '@/pages/PixPaymentAsaas';
+
 
 // Components
 import { Toaster } from './components/ui/toaster';
@@ -71,6 +73,8 @@ function App() {
                     <Route path="/payment-failed" element={<PaymentFailed />} />
                     <Route path="/payment-success" element={<PaymentSuccess />} />
                     <Route path="/payment-pending" element={<PaymentPending />} />
+                    <Route path="/pix-asaas/:productSlug" element={<PixPaymentAsaas />} />
+
 
                     {/* Rota de pagamento PIX manual com slug */}
                     <Route path="/pix-payment/:productSlug" element={<PixPaymentManual />} />

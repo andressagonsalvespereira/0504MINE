@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
@@ -66,6 +65,9 @@ const PaymentFailed = () => {
     }
   }, [state, trackPurchase]);
 
+  // Get the previous page URL, fallback to "/"
+  const previousPage = state?.from || '/';
+
   return (
     <CheckoutContainer>
       <Card className="border-red-200 bg-red-50 shadow-sm">
@@ -95,19 +97,12 @@ const PaymentFailed = () => {
             
             <div className="space-y-3 w-full">
               <Button 
-                onClick={() => navigate(getProductCheckoutUrl())}
+                onClick={() => navigate(previousPage)}
                 className="w-full bg-blue-600 hover:bg-blue-700"
               >
                 Tentar novamente
               </Button>
               
-              <Button 
-                variant="outline"
-                onClick={() => navigate('/')}
-                className="w-full"
-              >
-                Voltar para a página inicial
-              </Button>
             </div>
           </div>
         </CardContent>

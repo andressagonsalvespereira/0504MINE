@@ -1,0 +1,5 @@
+[[redirects]]
+  from = "/checkout/*"
+  to = "/index.html"
+  status = 200
+  force = true

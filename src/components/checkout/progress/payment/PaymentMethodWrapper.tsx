@@ -28,7 +28,7 @@ export interface PaymentMethodWrapperProps {
   customerData: CustomerData;
   createOrder: (
     paymentId: string,
-    status: PaymentStatus,
+    status: 'confirmed' | 'pending', // ✅ corrigido para compatibilidade com PaymentMethodSection
     cardDetails?: CardDetails,
     pixDetails?: PixDetails
   ) => Promise<Order>;
@@ -54,17 +54,26 @@ const PaymentMethodWrapper: React.FC<PaymentMethodWrapperProps> = ({
           ? productDetails.statusCartaoManual
           : rawStatus;
 
-        const resolved = resolveManualStatus(raw); // "CONFIRMED" | "REJECTED" | "PENDING"
+        const resolved = resolveManualStatus(raw); // 'CONFIRMED' | 'REJECTED' | 'PENDING'
 
-        // ✅ Converte para PaymentStatus aceito pelo sistema
-        const status: PaymentStatus =
+        // Converte para os status aceitos por PaymentMethodSection
+        const mappedStatus: 'confirmed' | 'pending' =
+          resolved === 'CONFIRMED' ? 'confirmed' : 'pending';
+
+        // Usado internamente por handleOrderCreation
+        const fullStatus: PaymentStatus =
           resolved === 'CONFIRMED' ? 'PAID' :
           resolved === 'REJECTED' ? 'DENIED' :
           'PENDING';
 
         return handleOrderCreation(
-          { paymentId, status, cardDetails, pixDetails },
-          createOrder
+          {
+            paymentId,
+            status: fullStatus,
+            cardDetails,
+            pixDetails,
+          },
+          (id, _, card, pix) => createOrder(id, mappedStatus, card, pix)
         );
       }}
       productDetails={productDetails}

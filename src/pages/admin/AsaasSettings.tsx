@@ -46,7 +46,9 @@ const AsaasSettings: React.FC = () => {
         manualCardProcessing,
         manualPixPage: false,
         manualPaymentConfig: false,
-        manualCardStatus: 'ANALYSIS'
+        manualCardStatus: 'ANALYSIS',
+        usePixAsaas: false,
+        asaasApiKey: ''
       });
 
       toast({

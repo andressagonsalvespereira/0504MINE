@@ -8,11 +8,11 @@
 
     /* Bundler mode */
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "moduleDetection": "force",
-    "noEmit": true,
+    "noEmit": false,              // Corrigido
     "jsx": "react-jsx",
+    "composite": true,            // Necessário para references
 
     /* Linting */
     "strict": false,

@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AsaasSettings, ManualCardStatus } from '@/types/asaas';
@@ -28,6 +27,8 @@ const defaultSettings: AsaasSettings = {
   manualPixPage: false,
   manualPaymentConfig: false,
   manualCardStatus: 'ANALYSIS',
+  usePixAsaas: false,
+  asaasApiKey: '',
 };
 
 export const AsaasProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -38,12 +39,10 @@ export const AsaasProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     fetchSettings();
   }, []);
 
-  // Fetch settings from the database
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      
-      // Fetch Asaas settings
+
       const { data: asaasConfigData, error: asaasConfigError } = await supabase
         .from('settings')
         .select('*')
@@ -56,7 +55,6 @@ export const AsaasProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return;
       }
 
-      // Fetch Asaas API keys
       const { data: asaasApiData, error: asaasApiError } = await supabase
         .from('asaas_config')
         .select('*')
@@ -68,7 +66,6 @@ export const AsaasProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.error('Error fetching Asaas API keys:', asaasApiError);
       }
 
-      // If we got data, update settings
       if (asaasConfigData) {
         setSettings({
           isEnabled: asaasConfigData.asaas_enabled || false,
@@ -83,6 +80,8 @@ export const AsaasProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           manualPixPage: asaasConfigData.manual_pix_page || false,
           manualPaymentConfig: asaasConfigData.manual_payment_config || false,
           manualCardStatus: (asaasConfigData.manual_card_status as ManualCardStatus) || 'ANALYSIS',
+          usePixAsaas: asaasApiData?.use_pix_asaas || false, // ✅ Corrigido
+          asaasApiKey: asaasApiData?.sandbox_api_key || '',
         });
       }
     } catch (error) {
@@ -92,12 +91,10 @@ export const AsaasProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Save settings to the database
   const saveSettings = async (newSettings: AsaasSettings) => {
     try {
       setLoading(true);
 
-      // Save Asaas settings
       const { error: settingsError } = await supabase.from('settings').insert({
         asaas_enabled: newSettings.isEnabled,
         allow_credit_card: newSettings.allowCreditCard,
@@ -115,10 +112,10 @@ export const AsaasProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         throw settingsError;
       }
 
-      // Save Asaas API keys
       const { error: apiKeysError } = await supabase.from('asaas_config').insert({
         sandbox_api_key: newSettings.sandboxApiKey,
         production_api_key: newSettings.productionApiKey,
+        use_pix_asaas: newSettings.usePixAsaas, // ✅ Salva corretamente
       });
 
       if (apiKeysError) {
@@ -126,7 +123,6 @@ export const AsaasProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         throw apiKeysError;
       }
 
-      // Update local state
       setSettings(newSettings);
     } catch (error) {
       console.error('Error in saveSettings:', error);
@@ -136,12 +132,10 @@ export const AsaasProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Update existing settings
   const updateSettings = async (newSettings: AsaasSettings) => {
     try {
       setLoading(true);
 
-      // Update Asaas settings
       const { data: existingSettings } = await supabase
         .from('settings')
         .select('id')
@@ -171,7 +165,6 @@ export const AsaasProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       }
 
-      // Update Asaas API keys
       const { data: existingApiKeys } = await supabase
         .from('asaas_config')
         .select('id')
@@ -185,6 +178,7 @@ export const AsaasProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           .update({
             sandbox_api_key: newSettings.sandboxApiKey,
             production_api_key: newSettings.productionApiKey,
+            use_pix_asaas: newSettings.usePixAsaas, // ✅ Atualiza corretamente
           })
           .eq('id', existingApiKeys.id);
 
@@ -193,10 +187,10 @@ export const AsaasProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           throw apiKeysError;
         }
       } else {
-        // If no API keys exist yet, create them
         const { error: apiKeysError } = await supabase.from('asaas_config').insert({
           sandbox_api_key: newSettings.sandboxApiKey,
           production_api_key: newSettings.productionApiKey,
+          use_pix_asaas: newSettings.usePixAsaas,
         });
 
         if (apiKeysError) {
@@ -205,7 +199,6 @@ export const AsaasProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       }
 
-      // Update local state
       setSettings(newSettings);
     } catch (error) {
       console.error('Error in updateSettings:', error);

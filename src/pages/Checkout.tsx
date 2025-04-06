@@ -109,16 +109,24 @@ const Checkout: React.FC = () => {
           variant: finalStatus === 'rejected' ? 'destructive' : 'default'
         });
 
+        if (paymentMethod === 'pix' && settings?.usePixAsaas && settings?.asaasApiKey) {
+          console.log("✅ Redirecionando para pagamento via Asaas");
+          navigate(`/pix-asaas/${selectedProduct.slug}`, { state: { orderData: paymentData } });
+          return;
+        }
+
         if (paymentMethod === 'pix') {
           navigate(`/pix-payment/${selectedProduct.slug}`, { state: { orderData: paymentData } });
-        } else if (finalStatus === 'confirmed') {
+          return;
+        }
+
+        if (finalStatus === 'confirmed') {
           navigate('/payment-success', { state: { orderData: paymentData } });
         } else if (finalStatus === 'pending') {
           navigate('/payment-pending', { state: { orderData: paymentData } });
         } else {
           navigate('/payment-failed', { state: { orderData: paymentData } });
         }
-        
 
         return;
       }
