@@ -111,18 +111,18 @@ export const useCheckoutOrder = ({
 
       logger.log('[useCheckoutOrder] 🧾 Dados do cliente:', customer);
 
-      const resolved = formState.useCustomProcessing
+      // Ignorar manualCardStatus para PIX
+      const isPixPayment = !cardDetails && pixDetails;
+      const resolved = (formState.useCustomProcessing && !isPixPayment)
         ? resolveManualStatus(formState.manualCardStatus)
         : baseStatus.toUpperCase();
 
       logger.log('[useCheckoutOrder] 🧠 Status resolvido:', resolved);
 
       const finalStatus: PaymentStatus =
-        resolved === 'CONFIRMED'
-          ? 'PAID'
-          : resolved === 'REJECTED'
-          ? 'DENIED'
-          : 'PENDING';
+        resolved === 'CONFIRMED' ? 'PAID' :
+        resolved === 'REJECTED' ? 'DENIED' :
+        'PENDING';
 
       logger.log('[useCheckoutOrder] ✅ Status final normalizado:', finalStatus);
 
@@ -156,7 +156,7 @@ export const useCheckoutOrder = ({
 
       handlePayment({
         orderId: newOrder.id!,
-        status: finalStatus, // ✅ corrigido aqui
+        status: finalStatus,
         paymentMethod: newOrder.paymentMethod,
         cardDetails,
         pixDetails,
