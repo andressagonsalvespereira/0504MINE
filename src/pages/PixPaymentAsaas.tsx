@@ -47,6 +47,7 @@ const PixPaymentAsaas: React.FC = () => {
           const storedOrderId = localStorage.getItem('lastOrderId');
           if (!storedOrderId) throw new Error("ID do pedido não encontrado.");
           setOrderId(storedOrderId);
+          logger.log("🔁 Recuperado orderId do localStorage:", storedOrderId);
 
           const order = await getOrderById(storedOrderId);
           if (!order || (!order.qrCode && !order.qrCodeImage)) {
@@ -55,8 +56,10 @@ const PixPaymentAsaas: React.FC = () => {
 
           orderData = order;
         } else if (orderData.orderId) {
-          setOrderId(orderData.orderId.toString());
-          localStorage.setItem('lastOrderId', orderData.orderId.toString());
+          const idString = orderData.orderId.toString();
+          setOrderId(idString);
+          localStorage.setItem('lastOrderId', idString);
+          logger.log("🧠 orderId salvo no estado e localStorage:", idString);
         }
 
         logger.log("QR Code recuperado:", {
@@ -94,7 +97,7 @@ const PixPaymentAsaas: React.FC = () => {
   }, [productSlug, getProductBySlug, getOrderById, settings, state, toast, navigate]);
 
   useEffect(() => {
-    logger.log("🔄 Iniciando verificação com ID:", orderId);
+    logger.log("🔄 useEffect do polling montado com orderId:", orderId);
     if (!orderId) return;
 
     const checkPaymentStatus = async () => {
@@ -112,9 +115,10 @@ const PixPaymentAsaas: React.FC = () => {
           return;
         }
 
-        const rawStatus = data.status || data.payment_status || '';
+        const rawStatus = data.payment_status ?? data.status ?? '';
         const status = resolveManualStatus(rawStatus);
         logger.log("🧾 Status bruto retornado do pedido:", rawStatus);
+        logger.log("✅ Status normalizado:", status);
 
         if (isConfirmedStatus(rawStatus)) {
           logger.log('✅ Pagamento confirmado → redirecionando...');
