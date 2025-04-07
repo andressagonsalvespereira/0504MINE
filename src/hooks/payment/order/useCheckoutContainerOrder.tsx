@@ -142,7 +142,7 @@ export const useCheckoutOrder = ({
           qrCodeImage: pixDetails?.qrCodeImage || "",
           expirationDate: pixDetails?.expirationDate || new Date().toISOString()
         } : undefined,
-        asaasPaymentId: isPixPayment ? paymentId : undefined,
+        asaas_payment_id: isPixPayment ? paymentId : undefined,
         orderDate: new Date().toISOString(),
         deviceType,
         isDigitalProduct: productDetails.isDigital,
