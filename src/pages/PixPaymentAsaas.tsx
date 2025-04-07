@@ -89,6 +89,7 @@ const PixPaymentAsaas: React.FC = () => {
     loadProductAndPaymentData();
   }, [productSlug, getProductBySlug, getOrderById, settings, state, toast, navigate]);
 
+  // Polling para verificar o status do pagamento
   useEffect(() => {
     logger.log("🎯 Iniciando polling com orderId:", orderId);
     if (!orderId) return;
@@ -110,13 +111,13 @@ const PixPaymentAsaas: React.FC = () => {
 
         const rawStatus = data.payment_status || data.status;
         const status = resolveManualStatus(rawStatus);
-        logger.log('📌 Status atual do pagamento normalizado:', status);
+        logger.log('📌 Status atual normalizado do pagamento:', status);
 
         if (status === 'CONFIRMED') {
           logger.log('✅ Pagamento confirmado → redirecionando...');
           navigate('/payment-success');
-        } else if (status === 'REJECTED') {
-          logger.warn('⚠️ Pagamento recusado → redirecionando...');
+        } else if (['REJECTED', 'DENIED', 'FAILED', 'OVERDUE'].includes(status)) {
+          logger.warn('⚠️ Pagamento recusado ou vencido → redirecionando...');
           navigate('/payment-failed');
         }
       } catch (error) {
