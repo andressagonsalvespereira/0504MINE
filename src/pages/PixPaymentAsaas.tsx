@@ -108,7 +108,7 @@ const PixPaymentAsaas: React.FC = () => {
           return;
         }
 
-        const status = data.payment_status || data.status;
+        const status = data.status;
         logger.log('📌 Status atual do pagamento:', status);
 
         if (status === 'CONFIRMED') {
