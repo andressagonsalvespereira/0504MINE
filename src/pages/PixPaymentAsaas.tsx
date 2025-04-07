@@ -1,131 +1,77 @@
-// netlify/functions/create-asaas-customer.ts
-import { Handler } from '@netlify/functions';
-import { createClient } from '@supabase/supabase-js';
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useOrders } from '@/contexts/order';
+// Removido getOrderById porque não existe ou não está sendo utilizado
+import { isConfirmedStatus, isRejectedStatus } from '@/contexts/order/utils/resolveManualStatus';
+import { logger } from '@/utils/logger';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const PixPaymentAsaas = () => {
+  const { orderId } = useParams<{ orderId: string }>();
+  const navigate = useNavigate();
+  const { orders } = useOrders();
+  const [order, setOrder] = useState(() =>
+    orders.find(o => o.id === Number(orderId))
+  );
+  const [loading, setLoading] = useState(true);
 
-const ASAAS_API_URL_CUSTOMERS = 'https://sandbox.asaas.com/api/v3/customers';
-const ASAAS_API_URL_PAYMENTS = 'https://sandbox.asaas.com/api/v3/payments';
-
-const handler: Handler = async (event) => {
-  console.log('Requisição recebida:', { method: event.httpMethod, body: event.body });
-
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: JSON.stringify({ error: 'Use POST.' }) };
-  }
-
-  if (!event.body) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Corpo vazio.' }) };
-  }
-
-  try {
-    const body = JSON.parse(event.body);
-    const {
-      customer_name: name,
-      customer_email: email,
-      customer_cpf: cpfCnpj,
-      customer_phone: phone,
-      price,
-      payment_method,
-      product_name,
-      order_id = null
-    } = body;
-
-    const apiKey = process.env.ASAAS_API_KEY;
-    if (!apiKey) throw new Error("API key não configurada");
-
-    const cleanCpfCnpj = cpfCnpj.replace(/[^\d]/g, '');
-
-    const customerRes = await fetch(ASAAS_API_URL_CUSTOMERS, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'access_token': apiKey,
-      },
-      body: JSON.stringify({
-        name,
-        email,
-        cpfCnpj: cleanCpfCnpj,
-        mobilePhone: phone?.replace(/[^\d]/g, ''),
-      }),
-    });
-
-    const customerData = await customerRes.json();
-    if (!customerRes.ok) {
-      return { statusCode: customerRes.status, body: JSON.stringify({ error: 'Erro ao criar cliente', details: customerData }) };
+  useEffect(() => {
+    if (!orderId) return navigate('/payment-failed');
+    if (!order) {
+      logger.error('[PixPaymentAsaas] Pedido não encontrado no contexto e getOrderById não implementado.');
+      return navigate('/payment-failed');
     }
+  }, [orderId, order, navigate]);
 
-    const paymentRes = await fetch(ASAAS_API_URL_PAYMENTS, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'access_token': apiKey,
-      },
-      body: JSON.stringify({
-        customer: customerData.id,
-        billingType: payment_method,
-        value: parseFloat(price),
-        dueDate: new Date().toISOString().split('T')[0],
-        description: product_name,
-      }),
-    });
+  useEffect(() => {
+    if (!order) return;
 
-    const paymentData = await paymentRes.json();
-    if (!paymentRes.ok) {
-      return { statusCode: paymentRes.status, body: JSON.stringify({ error: 'Erro ao criar pagamento', details: paymentData }) };
-    }
+    const createAsaasCharge = async () => {
+      try {
+        logger.log('[PixPaymentAsaas] Criando cobrança Asaas para order ID:', order.id);
 
-    let qrCodeData = { payload: '', qrCodeImage: '' };
-    const qrRes = await fetch(`${ASAAS_API_URL_PAYMENTS}/${paymentData.id}/pixQrCode`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'access_token': apiKey,
-      },
-    });
-    if (qrRes.ok) {
-      qrCodeData = await qrRes.json();
-    }
+        const response = await fetch('/.netlify/functions/create-asaas-customer', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            customer_name: order.customer_name,
+            customer_email: order.customer_email,
+            customer_cpf: order.customer_cpf,
+            customer_phone: order.customer_phone,
+            product_name: order.product_name,
+            price: order.price,
+            payment_method: 'PIX',
+            order_id: order.id,
+          }),
+        });
 
-    console.log('📦 Inserindo no Supabase...');
-    const insert = await supabase.from('asaas_payments').insert({
-      payment_id: paymentData.id,
-      order_id,
-      status: paymentData.status,
-      amount: paymentData.value,
-      method: paymentData.billingType,
-      qr_code: qrCodeData.payload || null,
-      qr_code_image: qrCodeData.qrCodeImage || null,
-      created_at: new Date().toISOString(),
-    });
+        const data = await response.json();
 
-    if (insert.error) {
-      console.error('❌ ERRO NO INSERT:', insert.error);
-      return { statusCode: 500, body: JSON.stringify({ error: 'Erro ao salvar no Supabase', details: insert.error.message }) };
-    }
+        if (!response.ok) {
+          throw new Error(data.error || 'Erro ao criar cobrança');
+        }
 
-    console.log('✅ Salvo com sucesso:', insert.data);
+        logger.log('[PixPaymentAsaas] ✅ Dados recebidos:', data);
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        ...paymentData,
-        pix: {
-          payload: qrCodeData.payload,
-          qrCodeImage: qrCodeData.qrCodeImage,
-        },
-      }),
+        // Aqui você pode salvar o QR Code no state, exibir na tela, etc.
+        setLoading(false);
+      } catch (error) {
+        logger.error('[PixPaymentAsaas] ❌ Erro ao criar cobrança:', error);
+        navigate('/payment-failed');
+      }
     };
-  } catch (err: any) {
-    console.error('❌ Erro geral:', err);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Erro interno', details: err.message }),
-    };
-  }
+
+    createAsaasCharge();
+  }, [order, navigate]);
+
+  return (
+    <div className="p-8 text-center">
+      <h1 className="text-2xl font-bold">Processando pagamento...</h1>
+      <p className="mt-2">Aguarde enquanto geramos sua cobrança PIX.</p>
+      {loading && <p className="mt-4 text-sm text-gray-500">Carregando...</p>}
+    </div>
+  );
 };
 
-export { handler };
+export default PixPaymentAsaas;
