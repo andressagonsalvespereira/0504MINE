@@ -29,6 +29,7 @@ const PixPaymentAsaas: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Carrega produto e dados do pedido
   useEffect(() => {
     const loadProductAndPaymentData = async () => {
       try {
@@ -47,7 +48,6 @@ const PixPaymentAsaas: React.FC = () => {
           const storedOrderId = localStorage.getItem('lastOrderId');
           if (!storedOrderId) throw new Error("ID do pedido não encontrado.");
           setOrderId(storedOrderId);
-          logger.log("🔁 Recuperado orderId do localStorage:", storedOrderId);
 
           const order = await getOrderById(storedOrderId);
           if (!order || (!order.qrCode && !order.qrCodeImage)) {
@@ -56,10 +56,8 @@ const PixPaymentAsaas: React.FC = () => {
 
           orderData = order;
         } else if (orderData.orderId) {
-          const idString = orderData.orderId.toString();
-          setOrderId(idString);
-          localStorage.setItem('lastOrderId', idString);
-          logger.log("🧠 orderId salvo no estado e localStorage:", idString);
+          setOrderId(orderData.orderId.toString());
+          localStorage.setItem('lastOrderId', orderData.orderId.toString());
         }
 
         logger.log("QR Code recuperado:", {
@@ -96,45 +94,42 @@ const PixPaymentAsaas: React.FC = () => {
     loadProductAndPaymentData();
   }, [productSlug, getProductBySlug, getOrderById, settings, state, toast, navigate]);
 
+  // Polling (só inicia após carregamento completo)
   useEffect(() => {
-    logger.log("🔄 useEffect do polling montado com orderId:", orderId);
-    if (!orderId) return;
+    if (!orderId || loading) return;
 
-    const checkPaymentStatus = async () => {
+    logger.log("🔁 Iniciando polling com orderId:", orderId);
+
+    const interval = setInterval(async () => {
       try {
         const { data, error } = await getOrderById(orderId);
-        logger.log("📦 Dados recebidos de getOrderById:", data);
+        logger.log("📦 Dados recebidos do Supabase:", data);
 
-        if (error) {
-          logger.error('Erro ao verificar status do pagamento:', error);
-          return;
-        }
-
-        if (!data) {
-          logger.warn('⚠️ Pedido não encontrado no Supabase.');
+        if (error || !data) {
+          logger.warn("⚠️ Erro ou pedido não encontrado:", error);
           return;
         }
 
         const rawStatus = data.payment_status ?? data.status ?? '';
-        const status = resolveManualStatus(rawStatus);
-        logger.log("🧾 Status bruto retornado do pedido:", rawStatus);
-        logger.log("✅ Status normalizado:", status);
+        const normalized = resolveManualStatus(rawStatus);
 
-        if (isConfirmedStatus(rawStatus)) {
-          logger.log('✅ Pagamento confirmado → redirecionando...');
-          navigate('/payment-success');
-        } else if (isRejectedStatus(rawStatus)) {
-          logger.warn('⚠️ Pagamento recusado ou vencido → redirecionando...');
-          navigate('/payment-failed');
+        logger.log("🔍 Status recebido do Supabase:", rawStatus);
+        logger.log("🔍 Status normalizado:", normalized);
+
+        if (isConfirmedStatus(normalized)) {
+          logger.log("✅ Status CONFIRMED → Redirecionando para /payment-success");
+          navigate("/payment-success");
+        } else if (isRejectedStatus(normalized)) {
+          logger.warn("❌ Status REJECTED → Redirecionando para /payment-failed");
+          navigate("/payment-failed");
         }
-      } catch (error) {
-        logger.error('Erro no polling do status do pagamento:', error);
+      } catch (err) {
+        logger.error("Erro no polling do status:", err);
       }
-    };
+    }, 5000);
 
-    const interval = setInterval(checkPaymentStatus, 5000);
     return () => clearInterval(interval);
-  }, [orderId, getOrderById, navigate]);
+  }, [orderId, loading, getOrderById, navigate]);
 
   if (loading) {
     return (
@@ -149,8 +144,6 @@ const PixPaymentAsaas: React.FC = () => {
     logger.error("Erro ao carregar dados do PIX:", { product, paymentData });
     return <div className="text-center text-red-500 mt-10">Erro ao carregar cobrança PIX.</div>;
   }
-
-  logger.log("Renderizando página de pagamento PIX com:", paymentData);
 
   return (
     <div className="max-w-lg mx-auto mt-10">
