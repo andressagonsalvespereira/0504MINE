@@ -42,6 +42,7 @@ export interface Order {
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   paymentId?: string;
+  asaasPaymentId?: string; // ← ADICIONE ISSO AQUI
   cardDetails?: CardDetails;
   pixDetails?: PixDetails;
   isDigitalProduct?: boolean;
