@@ -193,6 +193,7 @@ export type Database = {
           id: number;
           is_digital_product: boolean | null;
           payment_id: string | null;
+          asaas_payment_id: string | null;
           payment_method: string | null;
           price: number;
           product_id: number | null;
@@ -216,6 +217,7 @@ export type Database = {
           id?: number;
           is_digital_product?: boolean | null;
           payment_id?: string | null;
+          asaas_payment_id?: string | null;
           payment_method?: string | null;
           price: number;
           product_id?: number | null;
@@ -239,6 +241,7 @@ export type Database = {
           id?: number;
           is_digital_product?: boolean | null;
           payment_id?: string | null;
+          asaas_payment_id?: string | null;
           payment_method?: string | null;
           price?: number;
           product_id?: number | null;
@@ -422,7 +425,7 @@ export type Database = {
         Relationships: [];
       };
     };
-    Views?: never; // Não há views no banco, então removemos isso
+    Views?: never;
   };
 };
 

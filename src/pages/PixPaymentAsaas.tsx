@@ -1,196 +1,131 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { useProducts } from '@/contexts/ProductContext';
-import { useOrders } from '@/contexts/OrderContext';
-import { useAsaas } from '@/contexts/AsaasContext';
-import { logger } from '@/utils/logger';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import QRCode from 'qrcode.react';
-import {
-  resolveManualStatus,
-  isConfirmedStatus,
-  isRejectedStatus,
-} from '@/contexts/order/utils/resolveManualStatus';
+// netlify/functions/create-asaas-customer.ts
+import { Handler } from '@netlify/functions';
+import { createClient } from '@supabase/supabase-js';
 
-const PixPaymentAsaas: React.FC = () => {
-  const { productSlug } = useParams<{ productSlug: string }>();
-  const { state } = useLocation();
-  const { getProductBySlug } = useProducts();
-  const { getOrderById } = useOrders();
-  const { settings } = useAsaas();
-  const [loading, setLoading] = useState(true);
-  const [product, setProduct] = useState<any>(null);
-  const [paymentData, setPaymentData] = useState<any>(null);
-  const [useFallback, setUseFallback] = useState(false);
-  const [orderId, setOrderId] = useState<string | null>(null);
-  const { toast } = useToast();
-  const navigate = useNavigate();
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
-  // Carrega produto e dados do pedido
-  useEffect(() => {
-    const loadProductAndPaymentData = async () => {
-      try {
-        if (!productSlug) throw new Error("Slug do produto não informado.");
-        const foundProduct = await getProductBySlug(productSlug);
-        if (!foundProduct) throw new Error("Produto não encontrado.");
-        setProduct(foundProduct);
+const ASAAS_API_URL_CUSTOMERS = 'https://sandbox.asaas.com/api/v3/customers';
+const ASAAS_API_URL_PAYMENTS = 'https://sandbox.asaas.com/api/v3/payments';
 
-        if (!settings?.asaasApiKey) throw new Error("Chave da API do Asaas não configurada.");
-        logger.log("Produto encontrado:", foundProduct);
+const handler: Handler = async (event) => {
+  console.log('Requisição recebida:', { method: event.httpMethod, body: event.body });
 
-        let orderData = state?.orderData;
-        logger.log("Order data recebido via state:", orderData);
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, body: JSON.stringify({ error: 'Use POST.' }) };
+  }
 
-        if (!orderData || (!orderData.qrCode && !orderData.qrCodeImage)) {
-          const storedOrderId = localStorage.getItem('lastOrderId');
-          if (!storedOrderId) throw new Error("ID do pedido não encontrado.");
-          setOrderId(storedOrderId);
+  if (!event.body) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Corpo vazio.' }) };
+  }
 
-          const order = await getOrderById(storedOrderId);
-          if (!order || (!order.qrCode && !order.qrCodeImage)) {
-            throw new Error("Dados do pagamento PIX não encontrados no Supabase.");
-          }
+  try {
+    const body = JSON.parse(event.body);
+    const {
+      customer_name: name,
+      customer_email: email,
+      customer_cpf: cpfCnpj,
+      customer_phone: phone,
+      price,
+      payment_method,
+      product_name,
+      order_id = null
+    } = body;
 
-          orderData = order;
-        } else if (orderData.orderId) {
-          setOrderId(orderData.orderId.toString());
-          localStorage.setItem('lastOrderId', orderData.orderId.toString());
-        }
+    const apiKey = process.env.ASAAS_API_KEY;
+    if (!apiKey) throw new Error("API key não configurada");
 
-        logger.log("QR Code recuperado:", {
-          qrCode: orderData.qrCode,
-          qrCodeImage: orderData.qrCodeImage,
-        });
+    const cleanCpfCnpj = cpfCnpj.replace(/[^\d]/g, '');
 
-        const qrCodeImage = orderData.qrCodeImage;
-        if (!qrCodeImage || !qrCodeImage.startsWith("data:image/")) {
-          logger.warn("qrCodeImage inválido ou ausente, ativando fallback.");
-          setUseFallback(true);
-        }
+    const customerRes = await fetch(ASAAS_API_URL_CUSTOMERS, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'access_token': apiKey,
+      },
+      body: JSON.stringify({
+        name,
+        email,
+        cpfCnpj: cleanCpfCnpj,
+        mobilePhone: phone?.replace(/[^\d]/g, ''),
+      }),
+    });
 
-        setPaymentData({
-          pix: {
-            payload: orderData.qrCode,
-            qrCodeImage: qrCodeImage,
-          },
-        });
+    const customerData = await customerRes.json();
+    if (!customerRes.ok) {
+      return { statusCode: customerRes.status, body: JSON.stringify({ error: 'Erro ao criar cliente', details: customerData }) };
+    }
 
-      } catch (error: any) {
-        logger.error("Erro ao carregar dados do pagamento via Asaas:", error);
-        toast({
-          title: "Erro ao carregar cobrança",
-          description: error.message || "Não foi possível carregar o pagamento.",
-          variant: "destructive",
-        });
-        navigate('/payment-failed');
-      } finally {
-        setLoading(false);
-      }
+    const paymentRes = await fetch(ASAAS_API_URL_PAYMENTS, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'access_token': apiKey,
+      },
+      body: JSON.stringify({
+        customer: customerData.id,
+        billingType: payment_method,
+        value: parseFloat(price),
+        dueDate: new Date().toISOString().split('T')[0],
+        description: product_name,
+      }),
+    });
+
+    const paymentData = await paymentRes.json();
+    if (!paymentRes.ok) {
+      return { statusCode: paymentRes.status, body: JSON.stringify({ error: 'Erro ao criar pagamento', details: paymentData }) };
+    }
+
+    let qrCodeData = { payload: '', qrCodeImage: '' };
+    const qrRes = await fetch(`${ASAAS_API_URL_PAYMENTS}/${paymentData.id}/pixQrCode`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'access_token': apiKey,
+      },
+    });
+    if (qrRes.ok) {
+      qrCodeData = await qrRes.json();
+    }
+
+    console.log('📦 Inserindo no Supabase...');
+    const insert = await supabase.from('asaas_payments').insert({
+      payment_id: paymentData.id,
+      order_id,
+      status: paymentData.status,
+      amount: paymentData.value,
+      method: paymentData.billingType,
+      qr_code: qrCodeData.payload || null,
+      qr_code_image: qrCodeData.qrCodeImage || null,
+      created_at: new Date().toISOString(),
+    });
+
+    if (insert.error) {
+      console.error('❌ ERRO NO INSERT:', insert.error);
+      return { statusCode: 500, body: JSON.stringify({ error: 'Erro ao salvar no Supabase', details: insert.error.message }) };
+    }
+
+    console.log('✅ Salvo com sucesso:', insert.data);
+
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        ...paymentData,
+        pix: {
+          payload: qrCodeData.payload,
+          qrCodeImage: qrCodeData.qrCodeImage,
+        },
+      }),
     };
-
-    loadProductAndPaymentData();
-  }, [productSlug, getProductBySlug, getOrderById, settings, state, toast, navigate]);
-
-  // Polling (só inicia após carregamento completo)
-  useEffect(() => {
-    if (!orderId || loading) return;
-
-    logger.log("🔁 Iniciando polling com orderId:", orderId);
-
-    const interval = setInterval(async () => {
-      try {
-        const { data, error } = await getOrderById(orderId);
-        logger.log("📦 Dados recebidos do Supabase:", data);
-
-        if (error || !data) {
-          logger.warn("⚠️ Erro ou pedido não encontrado:", error);
-          return;
-        }
-
-        const rawStatus = data.payment_status ?? data.status ?? '';
-        const normalized = resolveManualStatus(rawStatus);
-
-        logger.log("🔍 Status recebido do Supabase:", rawStatus);
-        logger.log("🔍 Status normalizado:", normalized);
-
-        if (isConfirmedStatus(normalized)) {
-          logger.log("✅ Status CONFIRMED → Redirecionando para /payment-success");
-          navigate("/payment-success");
-        } else if (isRejectedStatus(normalized)) {
-          logger.warn("❌ Status REJECTED → Redirecionando para /payment-failed");
-          navigate("/payment-failed");
-        }
-      } catch (err) {
-        logger.error("Erro no polling do status:", err);
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [orderId, loading, getOrderById, navigate]);
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[300px]">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-        <span className="ml-2">Carregando dados do pagamento...</span>
-      </div>
-    );
+  } catch (err: any) {
+    console.error('❌ Erro geral:', err);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: 'Erro interno', details: err.message }),
+    };
   }
-
-  if (!product || !paymentData?.pix) {
-    logger.error("Erro ao carregar dados do PIX:", { product, paymentData });
-    return <div className="text-center text-red-500 mt-10">Erro ao carregar cobrança PIX.</div>;
-  }
-
-  return (
-    <div className="max-w-lg mx-auto mt-10">
-      <Card>
-        <CardHeader>
-          <CardTitle>Pagamento PIX via Asaas</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {useFallback || !paymentData.pix.qrCodeImage ? (
-            <div className="mx-auto w-60 h-60 flex items-center justify-center">
-              <QRCode
-                value={paymentData.pix.payload}
-                size={240}
-                level="H"
-                includeMargin={true}
-              />
-            </div>
-          ) : (
-            <img
-              src={paymentData.pix.qrCodeImage}
-              alt="QR Code PIX"
-              className="mx-auto w-60 h-60 border rounded"
-              onError={(e) => {
-                logger.error("Erro ao carregar imagem do QR code:", e);
-                setUseFallback(true);
-              }}
-              onLoad={() => logger.log("Imagem do QR code carregada com sucesso.")}
-            />
-          )}
-          <div className="text-center">
-            <p className="font-semibold">Escaneie o QR Code ou copie o código abaixo:</p>
-            <p className="bg-gray-100 p-2 rounded break-all text-sm">{paymentData.pix.payload}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-muted-foreground text-sm mt-2">
-              Produto: <strong>{product.nome}</strong> — R$ {Number(product.preco).toFixed(2)}
-            </p>
-          </div>
-          <div className="flex justify-center">
-            <Button onClick={() => navigator.clipboard.writeText(paymentData.pix.payload)}>
-              Copiar código PIX
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
 };
 
-export default PixPaymentAsaas;
+export { handler };

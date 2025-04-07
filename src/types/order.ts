@@ -42,7 +42,7 @@ export interface Order {
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   paymentId?: string;
-  asaas_payment_id?: string;
+  asaasPaymentId?: string;
   cardDetails?: CardDetails;
   pixDetails?: PixDetails;
   isDigitalProduct?: boolean;

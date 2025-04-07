@@ -160,8 +160,10 @@ const Checkout: React.FC = () => {
         pixDetails: paymentMethod === 'pix' && paymentData.pixDetails ? {
           qrCode: paymentData.pixDetails.qrCode,
           qrCodeImage: paymentData.pixDetails.qrCodeImage,
-          expirationDate: paymentData.pixDetails.expirationDate
+          expirationDate: paymentData.pixDetails.expirationDate,
+          asaasPaymentId: paymentData.asaasPaymentId || paymentData.paymentId,
         } : undefined
+        
       };
 
       logger.log("Criando pedido com dados:", orderData);

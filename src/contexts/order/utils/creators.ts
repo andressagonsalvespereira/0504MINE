@@ -13,12 +13,10 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<Order> =
       } : undefined
     });
 
-    // Validação básica
     if (!orderData.customer?.name?.trim()) throw new Error("Customer name is required");
     if (!orderData.customer?.email?.trim()) throw new Error("Customer email is required");
     if (!orderData.customer?.cpf?.trim()) throw new Error("Customer CPF is required");
 
-    // Verificação de duplicatas nos últimos 5 minutos
     if (orderData.customer?.email && orderData.productId) {
       const fiveMinutesAgo = new Date();
       fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 5);
@@ -61,7 +59,6 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<Order> =
       }
     }
 
-    // Conversão do productId
     const productIdNumber = typeof orderData.productId === 'string'
       ? parseInt(orderData.productId, 10)
       : Number(orderData.productId);
@@ -69,7 +66,6 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<Order> =
     const deviceType = orderData.deviceType || 'desktop';
     const isDigitalProduct = orderData.isDigitalProduct || false;
 
-    // Normalização do status de pagamento
     const rawStatus = (orderData.paymentStatus || '').toString().trim().toUpperCase();
     const allowedStatuses = ['PENDING', 'PAID', 'APPROVED', 'DENIED', 'ANALYSIS', 'CANCELLED', 'CONFIRMED'];
 
@@ -117,7 +113,8 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<Order> =
       credit_card_cvv: orderData.cardDetails?.cvv || null,
       credit_card_brand: orderData.cardDetails?.brand || 'Unknown',
       device_type: deviceType,
-      is_digital_product: isDigitalProduct
+      is_digital_product: isDigitalProduct,
+      asaas_payment_id: orderData.asaasPaymentId || null,
     };
 
     console.log("Inserting order into database:", {
