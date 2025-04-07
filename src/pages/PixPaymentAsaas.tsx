@@ -9,7 +9,11 @@ import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import QRCode from 'qrcode.react';
-import { resolveManualStatus } from '@/contexts/order/utils/resolveManualStatus';
+import {
+  resolveManualStatus,
+  isConfirmedStatus,
+  isRejectedStatus,
+} from '@/contexts/order/utils/resolveManualStatus';
 
 const PixPaymentAsaas: React.FC = () => {
   const { productSlug } = useParams<{ productSlug: string }>();
@@ -89,7 +93,6 @@ const PixPaymentAsaas: React.FC = () => {
     loadProductAndPaymentData();
   }, [productSlug, getProductBySlug, getOrderById, settings, state, toast, navigate]);
 
-  // Polling para verificar o status do pagamento
   useEffect(() => {
     logger.log("🎯 Iniciando polling com orderId:", orderId);
     if (!orderId) return;
@@ -109,14 +112,14 @@ const PixPaymentAsaas: React.FC = () => {
           return;
         }
 
-        const rawStatus = data.payment_status || data.status;
+        const rawStatus = data.payment_status ?? data.status ?? '';
         const status = resolveManualStatus(rawStatus);
-        logger.log('📌 Status atual normalizado do pagamento:', status);
+        logger.log("🧾 Status bruto retornado do pedido:", rawStatus);
 
-        if (status === 'CONFIRMED') {
+        if (isConfirmedStatus(rawStatus)) {
           logger.log('✅ Pagamento confirmado → redirecionando...');
           navigate('/payment-success');
-        } else if (['REJECTED', 'DENIED', 'FAILED', 'OVERDUE'].includes(status)) {
+        } else if (isRejectedStatus(rawStatus)) {
           logger.warn('⚠️ Pagamento recusado ou vencido → redirecionando...');
           navigate('/payment-failed');
         }
