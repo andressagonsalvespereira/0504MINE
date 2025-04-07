@@ -94,7 +94,7 @@ const PixPaymentAsaas: React.FC = () => {
   }, [productSlug, getProductBySlug, getOrderById, settings, state, toast, navigate]);
 
   useEffect(() => {
-    logger.log("🎯 Iniciando polling com orderId:", orderId);
+    logger.log("🔄 Iniciando verificação com ID:", orderId);
     if (!orderId) return;
 
     const checkPaymentStatus = async () => {
@@ -112,7 +112,7 @@ const PixPaymentAsaas: React.FC = () => {
           return;
         }
 
-        const rawStatus = data.payment_status ?? data.status ?? '';
+        const rawStatus = data.status || data.payment_status || '';
         const status = resolveManualStatus(rawStatus);
         logger.log("🧾 Status bruto retornado do pedido:", rawStatus);
 
