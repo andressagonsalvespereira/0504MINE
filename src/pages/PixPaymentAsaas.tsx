@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useProducts } from '@/contexts/ProductContext';
+import { useOrders } from '@/contexts/OrderContext';
 import { useAsaas } from '@/contexts/AsaasContext';
-import { useOrders } from '@/contexts/OrderContext'; // Adicionar contexto para buscar pedidos
 import { logger } from '@/utils/logger';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
@@ -14,12 +14,13 @@ const PixPaymentAsaas: React.FC = () => {
   const { productSlug } = useParams<{ productSlug: string }>();
   const { state } = useLocation();
   const { getProductBySlug } = useProducts();
-  const { getOrderById } = useOrders(); // Função para buscar pedido pelo ID
+  const { getOrderById } = useOrders();
   const { settings } = useAsaas();
   const [loading, setLoading] = useState(true);
   const [product, setProduct] = useState<any>(null);
   const [paymentData, setPaymentData] = useState<any>(null);
   const [useFallback, setUseFallback] = useState(false);
+  const [orderId, setOrderId] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -38,22 +39,25 @@ const PixPaymentAsaas: React.FC = () => {
         let orderData = state?.orderData;
         logger.log("Order data received via state:", orderData);
 
-        // Se o state.orderData não estiver disponível (ex.: após recarregamento), buscar no Supabase
-        if (!orderData || !orderData.pixDetails) {
-          const orderId = localStorage.getItem('lastOrderId'); // Supondo que você salvou o orderId
+        // Se o state.orderData não estiver disponível, buscar no Supabase
+        if (!orderData || (!orderData.qrCode && !orderData.qrCodeImage)) {
+          const orderId = localStorage.getItem('lastOrderId');
           if (!orderId) throw new Error("ID do pedido não encontrado.");
-          
+
           const order = await getOrderById(orderId);
-          if (!order || !order.pixDetails) {
+          if (!order || (!order.qrCode && !order.qrCodeImage)) {
             throw new Error("Dados do pagamento PIX não encontrados no Supabase.");
           }
           orderData = order;
+          setOrderId(orderId);
+        } else {
+          setOrderId(orderData.orderId.toString());
         }
 
-        logger.log("PIX details from orderData:", orderData.pixDetails);
+        logger.log("QR code data from orderData:", { qrCode: orderData.qrCode, qrCodeImage: orderData.qrCodeImage });
 
-        // Validar o qrCodeImage
-        const qrCodeImage = orderData.pixDetails.qrCodeImage;
+        // Verificar se o qrCodeImage é válido
+        const qrCodeImage = orderData.qrCodeImage;
         if (!qrCodeImage || !qrCodeImage.startsWith("data:image/")) {
           logger.warn("qrCodeImage inválido ou ausente, usando fallback:", qrCodeImage);
           setUseFallback(true);
@@ -61,7 +65,7 @@ const PixPaymentAsaas: React.FC = () => {
 
         setPaymentData({
           pix: {
-            payload: orderData.pixDetails.qrCode,
+            payload: orderData.qrCode,
             qrCodeImage: qrCodeImage,
           },
         });
@@ -81,6 +85,37 @@ const PixPaymentAsaas: React.FC = () => {
 
     loadProductAndPaymentData();
   }, [productSlug, getProductBySlug, getOrderById, settings, state, toast, navigate]);
+
+  // Polling para verificar o status do pagamento
+  useEffect(() => {
+    if (!orderId) return;
+
+    const checkPaymentStatus = async () => {
+      try {
+        const { data, error } = await getOrderById(orderId);
+        if (error) {
+          logger.error('Erro ao verificar status do pagamento:', error);
+          return;
+        }
+
+        if (data.payment_status === 'CONFIRMED') {
+          logger.log('Pagamento confirmado, redirecionando para /payment-success');
+          navigate('/payment-success');
+        } else if (data.payment_status === 'OVERDUE') {
+          logger.log('Pagamento vencido, redirecionando para /payment-failed');
+          navigate('/payment-failed');
+        }
+      } catch (error) {
+        logger.error('Erro ao verificar status do pagamento:', error);
+      }
+    };
+
+    // Verificar a cada 5 segundos
+    const interval = setInterval(checkPaymentStatus, 5000);
+
+    // Limpar o intervalo quando o componente for desmontado
+    return () => clearInterval(interval);
+  }, [orderId, getOrderById, navigate]);
 
   if (loading) {
     return (
