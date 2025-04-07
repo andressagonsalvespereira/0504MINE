@@ -24,30 +24,30 @@ const handler: Handler = async (event) => {
     }
 
     const body = JSON.parse(event.body);
-    logger.log('Webhook recebido do Asaas:', body);
+    logger.log('📬 Webhook recebido do Asaas:', body);
 
     const { event: eventType, payment } = body;
 
     if (eventType === 'payment.received') {
       const paymentId = payment.id;
-      const status = payment.status; // geralmente "RECEIVED"
+      const status = payment.status === 'RECEIVED' ? 'PAID' : payment.status.toUpperCase();
 
       const { data, error } = await supabase
         .from('orders')
-        .update({ payment_status: status }) // ou 'status' se for esse o campo correto
-        .eq('asaas_payment_id', paymentId) // substitua se o campo no Supabase for diferente
+        .update({ payment_status: status })
+        .eq('asaas_payment_id', paymentId)
         .select()
         .single();
 
       if (error) {
-        logger.error('Erro ao atualizar pedido no Supabase:', error);
+        logger.error('❌ Erro ao atualizar pedido no Supabase:', error);
         return {
           statusCode: 500,
           body: JSON.stringify({ error: 'Erro ao atualizar pedido.' }),
         };
       }
 
-      logger.log('Pedido atualizado com sucesso:', data);
+      logger.log('✅ Pedido atualizado com sucesso:', data);
       return {
         statusCode: 200,
         body: JSON.stringify({ message: 'Webhook processado com sucesso.' }),
@@ -59,7 +59,7 @@ const handler: Handler = async (event) => {
       body: JSON.stringify({ message: 'Evento ignorado.' }),
     };
   } catch (error) {
-    logger.error('Erro ao processar webhook:', error);
+    logger.error('❌ Erro ao processar webhook:', error);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: 'Erro interno ao processar webhook.' }),
