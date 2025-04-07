@@ -9,15 +9,7 @@ import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import QRCode from 'qrcode.react';
-
-// ✅ Função para normalizar status
-const resolveManualStatus = (status: string | null | undefined): string => {
-  const s = (status || '').toUpperCase().trim();
-  if (['CONFIRMED', 'PAID', 'SUCCESS', 'APPROVED', 'COMPLETED'].includes(s)) return 'CONFIRMED';
-  if (['PENDING', 'AGUARDANDO'].includes(s)) return 'PENDING';
-  if (['DENIED', 'FAILED', 'REJECTED', 'OVERDUE', 'CANCELLED'].includes(s)) return 'REJECTED';
-  return 'PENDING';
-};
+import { resolveManualStatus } from '@/contexts/order/utils/resolveManualStatus';
 
 const PixPaymentAsaas: React.FC = () => {
   const { productSlug } = useParams<{ productSlug: string }>();
@@ -97,10 +89,10 @@ const PixPaymentAsaas: React.FC = () => {
     loadProductAndPaymentData();
   }, [productSlug, getProductBySlug, getOrderById, settings, state, toast, navigate]);
 
-  // 🔁 Polling para verificar status do pagamento
+  // Polling para verificar o status do pagamento
   useEffect(() => {
-    logger.log("🎯 Iniciando polling com orderId:", orderId);
     if (!orderId) return;
+    logger.log("🎯 Iniciando polling com orderId:", orderId);
 
     const checkPaymentStatus = async () => {
       try {
@@ -118,14 +110,14 @@ const PixPaymentAsaas: React.FC = () => {
         }
 
         const rawStatus = data.payment_status || data.status;
-        const normalized = resolveManualStatus(rawStatus);
-        logger.log(`📌 Status original: ${rawStatus} → Normalizado: ${normalized}`);
+        const status = resolveManualStatus(rawStatus);
+        logger.log("🧭 Status normalizado:", status);
 
-        if (normalized === 'CONFIRMED') {
+        if (status === 'CONFIRMED') {
           logger.log('✅ Pagamento confirmado → redirecionando...');
           navigate('/payment-success');
-        } else if (normalized === 'REJECTED') {
-          logger.warn('🚫 Pagamento recusado → redirecionando...');
+        } else if (status === 'REJECTED') {
+          logger.warn('⚠️ Pagamento recusado → redirecionando...');
           navigate('/payment-failed');
         }
       } catch (error) {
@@ -172,7 +164,10 @@ const PixPaymentAsaas: React.FC = () => {
               src={paymentData.pix.qrCodeImage}
               alt="QR Code PIX"
               className="mx-auto w-60 h-60 border rounded"
-              onError={() => setUseFallback(true)}
+              onError={() => {
+                logger.error("Erro ao carregar imagem do QR code.");
+                setUseFallback(true);
+              }}
               onLoad={() => logger.log("Imagem do QR code carregada com sucesso.")}
             />
           )}
