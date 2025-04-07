@@ -35,31 +35,33 @@ const PixPaymentAsaas: React.FC = () => {
         if (!settings?.asaasApiKey) throw new Error("Chave da API do Asaas não configurada.");
         logger.log("Produto encontrado:", foundProduct);
 
-        // Usar os dados do pedido passados via state
         let orderData = state?.orderData;
-        logger.log("Order data received via state:", orderData);
+        logger.log("Order data recebido via state:", orderData);
 
-        // Se o state.orderData não estiver disponível, buscar no Supabase
         if (!orderData || (!orderData.qrCode && !orderData.qrCodeImage)) {
-          const orderId = localStorage.getItem('lastOrderId');
-          if (!orderId) throw new Error("ID do pedido não encontrado.");
+          const storedOrderId = localStorage.getItem('lastOrderId');
+          if (!storedOrderId) throw new Error("ID do pedido não encontrado.");
+          setOrderId(storedOrderId);
 
-          const order = await getOrderById(orderId);
+          const order = await getOrderById(storedOrderId);
           if (!order || (!order.qrCode && !order.qrCodeImage)) {
             throw new Error("Dados do pagamento PIX não encontrados no Supabase.");
           }
+
           orderData = order;
-          setOrderId(orderId);
-        } else {
+        } else if (orderData.orderId) {
           setOrderId(orderData.orderId.toString());
+          localStorage.setItem('lastOrderId', orderData.orderId.toString());
         }
 
-        logger.log("QR code data from orderData:", { qrCode: orderData.qrCode, qrCodeImage: orderData.qrCodeImage });
+        logger.log("QR Code recuperado:", {
+          qrCode: orderData.qrCode,
+          qrCodeImage: orderData.qrCodeImage,
+        });
 
-        // Verificar se o qrCodeImage é válido
         const qrCodeImage = orderData.qrCodeImage;
         if (!qrCodeImage || !qrCodeImage.startsWith("data:image/")) {
-          logger.warn("qrCodeImage inválido ou ausente, usando fallback:", qrCodeImage);
+          logger.warn("qrCodeImage inválido ou ausente, ativando fallback.");
           setUseFallback(true);
         }
 
@@ -88,32 +90,40 @@ const PixPaymentAsaas: React.FC = () => {
 
   // Polling para verificar o status do pagamento
   useEffect(() => {
+    logger.log("🎯 Iniciando polling com orderId:", orderId);
     if (!orderId) return;
 
     const checkPaymentStatus = async () => {
       try {
         const { data, error } = await getOrderById(orderId);
+        logger.log("📦 Dados recebidos de getOrderById:", data);
+
         if (error) {
           logger.error('Erro ao verificar status do pagamento:', error);
           return;
         }
 
-        if (data.payment_status === 'CONFIRMED') {
-          logger.log('Pagamento confirmado, redirecionando para /payment-success');
+        if (!data) {
+          logger.warn('⚠️ Pedido não encontrado no Supabase.');
+          return;
+        }
+
+        const status = data.payment_status || data.status;
+        logger.log('📌 Status atual do pagamento:', status);
+
+        if (status === 'CONFIRMED') {
+          logger.log('✅ Pagamento confirmado → redirecionando...');
           navigate('/payment-success');
-        } else if (data.payment_status === 'OVERDUE') {
-          logger.log('Pagamento vencido, redirecionando para /payment-failed');
+        } else if (['REJECTED', 'DENIED', 'FAILED', 'OVERDUE'].includes(status)) {
+          logger.warn('⚠️ Pagamento recusado ou vencido → redirecionando...');
           navigate('/payment-failed');
         }
       } catch (error) {
-        logger.error('Erro ao verificar status do pagamento:', error);
+        logger.error('Erro no polling do status do pagamento:', error);
       }
     };
 
-    // Verificar a cada 5 segundos
     const interval = setInterval(checkPaymentStatus, 5000);
-
-    // Limpar o intervalo quando o componente for desmontado
     return () => clearInterval(interval);
   }, [orderId, getOrderById, navigate]);
 
@@ -131,7 +141,7 @@ const PixPaymentAsaas: React.FC = () => {
     return <div className="text-center text-red-500 mt-10">Erro ao carregar cobrança PIX.</div>;
   }
 
-  logger.log("Rendering PIX payment page with data:", paymentData);
+  logger.log("Renderizando página de pagamento PIX com:", paymentData);
 
   return (
     <div className="max-w-lg mx-auto mt-10">

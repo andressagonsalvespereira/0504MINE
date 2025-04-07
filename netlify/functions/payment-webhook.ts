@@ -28,15 +28,14 @@ const handler: Handler = async (event) => {
 
     const { event: eventType, payment } = body;
 
-    if (eventType === 'PAYMENT_CONFIRMED') {
+    if (eventType === 'payment.received') {
       const paymentId = payment.id;
-      const status = payment.status;
+      const status = payment.status; // geralmente "RECEIVED"
 
-      // Atualizar o pedido no Supabase
       const { data, error } = await supabase
         .from('orders')
-        .update({ payment_status: status })
-        .eq('payment_id', paymentId)
+        .update({ payment_status: status }) // ou 'status' se for esse o campo correto
+        .eq('asaas_payment_id', paymentId) // substitua se o campo no Supabase for diferente
         .select()
         .single();
 

@@ -3,6 +3,7 @@ import { PaymentResult, CustomerData } from '@/types/payment';
 import { AsaasSettings } from '@/types/asaas';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/utils/logger';
+import { resolveManualStatus } from '@/contexts/order/utils/resolveManualStatus';
 
 interface PixPaymentHookProps {
   onSubmit: (data: PaymentResult) => Promise<any>;
@@ -37,7 +38,6 @@ export const usePixPayment = ({
     if (error) setError(null);
   };
   
-  // Generate PIX QR code
   const generatePixQrCode = async () => {
     try {
       setIsLoading(true);
@@ -45,12 +45,9 @@ export const usePixPayment = ({
       
       logger.log("Generating PIX QR Code", { isSandbox, isDigitalProduct });
       
-      // Fazer a requisição para create-asaas-customer
       const response = await fetch('/.netlify/functions/create-asaas-customer', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customer_name: customerData?.name || "Cliente Desconhecido",
           customer_email: customerData?.email || "cliente@desconhecido.com",
@@ -75,7 +72,6 @@ export const usePixPayment = ({
       const paymentData = await response.json();
       logger.log("Payment data from Asaas:", paymentData);
 
-      // Garantir que qrCodeImage esteja no formato correto (data:image/png;base64,...)
       const qrCodeImage = paymentData.pix?.qrCodeImage || paymentData.qrCodeImage || "";
       const formattedQrCodeImage = qrCodeImage.startsWith("data:image/")
         ? qrCodeImage
@@ -83,21 +79,19 @@ export const usePixPayment = ({
         ? `data:image/png;base64,${qrCodeImage}`
         : "";
 
-      // Estrutura esperada do PaymentResult
       const result: PaymentResult = {
         success: true,
         method: 'pix',
         paymentId: paymentData.id || `pix_${Date.now()}`,
-        status: paymentData.status === 'PENDING' ? 'pending' : 'confirmed',
+        status: resolveManualStatus(paymentData.status), // ✅ status normalizado aqui
         timestamp: new Date().toISOString(),
         qrCode: paymentData.pix?.payload || paymentData.qrCode || "QR_CODE_NOT_AVAILABLE",
         qrCodeImage: formattedQrCodeImage,
-        expirationDate: paymentData.pix?.expirationDate || new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutos
+        expirationDate: paymentData.pix?.expirationDate || new Date(Date.now() + 30 * 60 * 1000).toISOString()
       };
 
       logger.log("Mapped PaymentResult:", result);
 
-      // Update state with PIX data
       setPixData({
         qrCode: result.qrCode,
         qrCodeImage: result.qrCodeImage,
@@ -105,33 +99,28 @@ export const usePixPayment = ({
         expirationDate: result.expirationDate
       });
       
-      // Submit payment data to parent component
       if (onSubmit) {
         logger.log("Calling onSubmit with result:", result);
         await onSubmit(result);
       }
-      
+
       logger.log("PIX QR Code generated successfully");
       return result;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to generate PIX QR Code";
       logger.error("Error generating PIX QR Code:", err);
       setError(errorMessage);
-      
       toast({
         title: "Error",
         description: errorMessage,
         variant: "destructive",
       });
-      
-      // Não rejeitar a promessa, apenas logar o erro
       return null;
     } finally {
       setIsLoading(false);
     }
   };
-  
-  // Handle copy to clipboard
+
   const handleCopyToClipboard = useCallback((text: string) => {
     navigator.clipboard.writeText(text)
       .then(() => {
@@ -150,8 +139,7 @@ export const usePixPayment = ({
         });
       });
   }, [toast]);
-  
-  // Auto-generate PIX code on first render if in manual mode
+
   useEffect(() => {
     if (settings?.manualPixPage && !pixData && !isLoading) {
       generatePixQrCode().catch((err) => {
@@ -159,7 +147,7 @@ export const usePixPayment = ({
       });
     }
   }, [settings?.manualPixPage, pixData, isLoading]);
-  
+
   return {
     isLoading,
     error,
