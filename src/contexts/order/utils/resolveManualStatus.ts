@@ -5,7 +5,7 @@ export type ManualStatus = "PENDING" | "CONFIRMED" | "REJECTED";
 
 /**
  * Normaliza status de pagamento manual para valores padrão suportados pelo sistema
- * @param status Status original do pagamento (qualquer string ou nulo)
+ * @param status Status original do pagamento (pode ser qualquer string)
  * @returns Status normalizado: "PENDING", "CONFIRMED" ou "REJECTED"
  */
 export const resolveManualStatus = (
@@ -18,7 +18,7 @@ export const resolveManualStatus = (
     return "PENDING";
   }
 
-  const normalizedStatus = status.trim().toUpperCase();
+  const normalizedStatus = status.toUpperCase();
   console.log("[resolveManualStatus] Normalizado para:", normalizedStatus);
 
   if (
@@ -29,7 +29,7 @@ export const resolveManualStatus = (
   }
 
   if (
-    ["REJECTED", "DENIED", "FAILED", "RECUSADO", "NEGADO", "CANCELADO", "DECLINED", "EXPIRED", "OVERDUE"].includes(normalizedStatus)
+    ["REJECTED", "DENIED", "FAILED", "RECUSADO", "NEGADO", "CANCELADO", "DECLINED"].includes(normalizedStatus)
   ) {
     console.log("[resolveManualStatus] Reconhecido como REJECTED");
     return "REJECTED";
@@ -40,16 +40,7 @@ export const resolveManualStatus = (
 };
 
 /**
- * Verifica se o status representa um pagamento confirmado
- */
-export const isConfirmedStatus = (status: string | undefined | null): boolean => {
-  const result = resolveManualStatus(status) === "CONFIRMED";
-  console.log("[isConfirmedStatus] Status:", status, "→", result);
-  return result;
-};
-
-/**
- * Verifica se o status representa um pagamento recusado
+ * Verifica se um status é considerado rejeitado/recusado
  */
 export const isRejectedStatus = (status: string | undefined | null): boolean => {
   const result = resolveManualStatus(status) === "REJECTED";
@@ -58,7 +49,16 @@ export const isRejectedStatus = (status: string | undefined | null): boolean => 
 };
 
 /**
- * Verifica se o status representa um pagamento pendente
+ * Verifica se um status é considerado confirmado/aprovado
+ */
+export const isConfirmedStatus = (status: string | undefined | null): boolean => {
+  const result = resolveManualStatus(status) === "CONFIRMED";
+  console.log("[isConfirmedStatus] Status:", status, "→", result);
+  return result;
+};
+
+/**
+ * Verifica se um status é considerado pendente/em análise
  */
 export const isPendingStatus = (status: string | undefined | null): boolean => {
   const result = resolveManualStatus(status) === "PENDING";

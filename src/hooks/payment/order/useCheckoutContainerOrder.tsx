@@ -142,6 +142,7 @@ export const useCheckoutOrder = ({
           qrCodeImage: pixDetails?.qrCodeImage || "",
           expirationDate: pixDetails?.expirationDate || new Date().toISOString()
         } : undefined,
+        asaasPaymentId: isPixPayment ? paymentId : undefined,
         orderDate: new Date().toISOString(),
         deviceType,
         isDigitalProduct: productDetails.isDigital,
@@ -149,7 +150,6 @@ export const useCheckoutOrder = ({
 
       logger.log('[useCheckoutOrder] ✅ Pedido criado com sucesso! ID:', newOrder.id);
 
-      // Salvar o orderId no localStorage para recuperação futura
       localStorage.setItem('lastOrderId', newOrder.id!.toString());
 
       toast({
